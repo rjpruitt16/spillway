@@ -18,6 +18,8 @@ Content-Type: application/json
 }
 ```
 
+`webhook_url` is optional. Omit it when the caller only needs Spillway to execute the job and will use `GET /jobs/:id` or remote result storage if it needs the terminal result. When set, Spillway delivers the normal completion webhook.
+
 `execute_before` is optional Unix time in milliseconds. Spillway checks it immediately before dispatch and before every retry. Work that has not started its next attempt by that time is never sent upstream; it becomes `failed` with reason `execution_deadline_exceeded`, remains pollable through the normal failed-result retention window, and emits the normal failed SSE/webhook event.
 
 **Response headers your API can return to control pacing:**

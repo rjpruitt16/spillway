@@ -1401,17 +1401,19 @@ defmodule Spillway.AccountQueue do
   # for forward dispatch to an arbitrary upstream API, so this only applies
   # when the job being dispatched is itself a webhook delivery (see
   # Job.webhook_delivery_job?/1). Mirrors Aquifer's account_queue.go makeRequest.
-  defp maybe_seal_l8(%Job{webhook_url: url} = job, dispatch_url) when url in [nil, ""] do
-    Spillway.L8.ensure_trust(dispatch_url)
-    content_type = Map.get(job.headers || %{}, "Content-Type", "application/json")
+  defp maybe_seal_l8(job, dispatch_url) do
+    if Job.webhook_delivery_job?(job) do
+      Spillway.L8.ensure_trust(dispatch_url)
+      content_type = Map.get(job.headers || %{}, "Content-Type", "application/json")
 
-    {:ok, body, headers} =
-      Spillway.L8.seal_delivery(dispatch_url, job.body || "", content_type)
+      {:ok, body, headers} =
+        Spillway.L8.seal_delivery(dispatch_url, job.body || "", content_type)
 
-    {body, headers}
+      {body, headers}
+    else
+      {job.body || "", %{}}
+    end
   end
-
-  defp maybe_seal_l8(job, _dispatch_url), do: {job.body || "", %{}}
 
   # Opts every dispatch into ORCA reporting by default, unless the caller
   # already set the format header explicitly -- mirrors Aquifer's
