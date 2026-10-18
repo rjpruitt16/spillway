@@ -251,6 +251,20 @@ defmodule Spillway.IdempotentStore do
   end
 
   defp update_status_local(job_id, status) do
+    case status_change(job_id, status) do
+      {ops, old_status} ->
+        Store.write(ops)
+        count_move(old_status, status)
+        :ok
+
+      nil ->
+        :error
+    end
+  end
+
+  # The writes that move a stored job to `status`, and the status it had, or
+  # nil when the job is gone.
+  defp status_change(job_id, status) do
     case read_job_row(job_id) do
       {job, old_expires, old_status} ->
         new_expires = System.system_time(:millisecond) + ttl_ms(status)
@@ -262,21 +276,86 @@ defmodule Spillway.IdempotentStore do
             _ -> []
           end
 
-        Store.write(
+        ops =
           [
             {:put, :jobs, job_id, {job, new_expires, status}},
             index_put_op(new_expires, job_id, hashed, status)
           ] ++
             if(old_expires != new_expires, do: [index_delete_op(old_expires, job_id)], else: []) ++
             key_ops ++ drain_event_ops(job, hashed, status)
-        )
 
-        count_move(old_status, status)
-        :ok
+        {ops, old_status}
 
       nil ->
-        :error
+        nil
     end
+  end
+
+  @doc """
+  Marks a job :completed or :failed and, in the same store write, persists
+  the webhook delivery job that reports it (see Job.new_webhook_delivery/5).
+
+  Marking the job finished and then inserting its delivery as a second write
+  left a gap: a node killed between the two stored the job as finished with
+  no delivery, and recovery only reloads unfinished jobs, so that webhook was
+  never sent (soak run 3l lost 7-26 per kill -9). One write means a kill
+  leaves either both, and recovery queues the delivery, or neither, and the
+  job runs again.
+
+  Returns :inserted when the delivery is new and the caller should queue it
+  (AccountQueueRegistry.enqueue_delivery/1), :duplicate when this job's
+  webhook was already stored, or :none with no delivery.
+  """
+  def finish(job_id, status, delivery) when status in [:completed, :failed] do
+    route_job(job_id, {:finish, job_id, status, delivery}, fn ->
+      finish_local(job_id, status, delivery)
+    end)
+  end
+
+  defp finish_local(job_id, status, nil) do
+    update_status_local(job_id, status)
+    :none
+  end
+
+  defp finish_local(job_id, status, %Job{} = delivery) do
+    hashed = hash_key(delivery)
+
+    outcome =
+      with_key_gate(hashed, fn ->
+        {outcome, delivery_ops} =
+          case read_key_row(hashed) do
+            {_existing_id, _expires_at, _status} ->
+              {:duplicate, []}
+
+            nil ->
+              expires_at = System.system_time(:millisecond) + ttl_ms(:queued)
+
+              {:inserted,
+               [
+                 {:put, :keys, hashed, {delivery.id, expires_at, :queued}},
+                 {:put, :jobs, delivery.id, {delivery, expires_at, :queued}},
+                 index_put_op(expires_at, delivery.id, hashed, :queued)
+               ]}
+          end
+
+        case status_change(job_id, status) do
+          {status_ops, old_status} ->
+            Store.write(status_ops ++ delivery_ops)
+            count_move(old_status, status)
+
+          nil ->
+            Store.write(delivery_ops)
+        end
+
+        outcome
+      end)
+
+    if outcome == :inserted do
+      count_insert(:queued)
+      register_job_owner(delivery.id)
+    end
+
+    outcome
   end
 
   @doc """
@@ -597,6 +676,9 @@ defmodule Spillway.IdempotentStore do
 
   def handle_call({:job_store, {:update_status, job_id, status}}, _from, state),
     do: {:reply, update_status_local(job_id, status), state}
+
+  def handle_call({:job_store, {:finish, job_id, status, delivery}}, _from, state),
+    do: {:reply, finish_local(job_id, status, delivery), state}
 
   def handle_call({:job_store, {:record_retry, job}}, _from, state),
     do: {:reply, record_retry_local(job), state}
