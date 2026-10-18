@@ -178,6 +178,34 @@ defmodule Spillway.AccountQueueRegistry do
   end
 
   @doc """
+  Queues a webhook delivery job that IdempotentStore.finish/3 already stored,
+  without storing it again. Like enqueue_webhook/5 it skips client
+  admission; a delivery that still can't be queued stays readable at
+  GET /jobs/:id. If the node dies before this runs, startup recovery
+  queues the stored delivery instead.
+  """
+  def enqueue_delivery(%Job{} = job) do
+    pid = actor_for(job)
+
+    result =
+      if Cluster.standalone?(),
+        do: admit_here(pid, job, nil, :internal),
+        else: route_to_actor(pid, :enqueue, job, nil)
+
+    case result do
+      {:rejected, reason, _limit, _current} ->
+        Logger.error(
+          "[Webhook] could not queue the webhook #{job.id}: #{reason}; the result is still stored"
+        )
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  end
+
+  @doc """
   Queues a webhook delivery through the same domain-keyed account-queue
   pacing and backpressure machinery as forward dispatch (RPS/concurrency
   limits, X-Aqueduct-*/X-EZThrottle-* response-header throttling) instead

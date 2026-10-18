@@ -792,7 +792,8 @@ defmodule Spillway.AccountQueue do
     payload = %{job_id: job.id, status: "failed", reason: reason}
 
     IdempotentStore.put_result(job.id, payload, :failed)
-    IdempotentStore.update_status(job.id, :failed)
+    delivery = webhook_delivery(IdempotentStore.get_delivery_mode(job.id), job, payload)
+    webhook = IdempotentStore.finish(job.id, :failed, delivery)
     Metrics.job_failed(job.user_id, upstream, reason)
 
     Phoenix.PubSub.broadcast(
@@ -801,9 +802,9 @@ defmodule Spillway.AccountQueue do
       {:job_event, Map.put(payload, :event, "failed")}
     )
 
-    Task.start(fn ->
-      maybe_deliver_webhook(IdempotentStore.get_delivery_mode(job.id), job, payload)
-    end)
+    # Queued from a task: this runs inside the queue's own process, and the
+    # delivery may route back to this same queue.
+    Task.start(fn -> maybe_enqueue_webhook(webhook, delivery) end)
   end
 
   # Pool-backed queue: resolve via weighted selection. nil url/pool_pid on
@@ -877,7 +878,11 @@ defmodule Spillway.AccountQueue do
         }
 
         IdempotentStore.put_result(job.id, completed_payload, :completed)
-        IdempotentStore.update_status(job.id, :completed)
+
+        delivery =
+          webhook_delivery(IdempotentStore.get_delivery_mode(job.id), job, completed_payload)
+
+        webhook = IdempotentStore.finish(job.id, :completed, delivery)
 
         Metrics.job_completed(
           job.user_id,
@@ -897,12 +902,7 @@ defmodule Spillway.AccountQueue do
            }}
         )
 
-        maybe_deliver_webhook(IdempotentStore.get_delivery_mode(job.id), job, %{
-          job_id: job.id,
-          status: "completed",
-          response_status: status,
-          body: body
-        })
+        maybe_enqueue_webhook(webhook, delivery)
 
       {:retryable, reason, response} ->
         if pool_pid && member_id, do: Pool.record_failure(pool_pid, member_id)
@@ -957,7 +957,8 @@ defmodule Spillway.AccountQueue do
       |> maybe_put_response(response)
 
     IdempotentStore.put_result(job.id, failed_payload, :failed)
-    IdempotentStore.update_status(job.id, :failed)
+    delivery = webhook_delivery(IdempotentStore.get_delivery_mode(job.id), job, failed_payload)
+    webhook = IdempotentStore.finish(job.id, :failed, delivery)
     Metrics.job_failed(job.user_id, upstream, to_string(reason))
 
     Phoenix.PubSub.broadcast(
@@ -966,7 +967,7 @@ defmodule Spillway.AccountQueue do
       {:job_event, Map.put(failed_payload, :event, "failed")}
     )
 
-    maybe_deliver_webhook(IdempotentStore.get_delivery_mode(job.id), job, failed_payload)
+    maybe_enqueue_webhook(webhook, delivery)
   end
 
   # One attempt. Connection errors, 5xx, 408 and 429 are retryable; any other
@@ -1031,17 +1032,17 @@ defmodule Spillway.AccountQueue do
     |> Map.put(:body, body)
   end
 
-  # A webhook-delivery job (Job.webhook_delivery_job?/1) must never
-  # enqueue its own webhook -- it flows through this same execute/8 path
-  # as a regular job, so without this guard first, its own completion
-  # would recursively enqueue another webhook delivery forever.
-  defp maybe_deliver_webhook(_mode, %Job{webhook_url: url}, _payload) when url in [nil, ""],
-    do: :ok
+  # The webhook delivery job that reports a finished job, or nil when it gets
+  # none. IdempotentStore.finish/3 stores it in the same write that marks the
+  # job finished. A webhook-delivery job (Job.webhook_delivery_job?/1) must
+  # never get its own webhook -- it flows through this same execute/8 path as
+  # a regular job, so without this guard first, its own completion would
+  # recursively enqueue another webhook delivery forever.
+  defp webhook_delivery(_mode, %Job{webhook_url: url}, _payload) when url in [nil, ""], do: nil
+  defp webhook_delivery(:stream, _job, _payload), do: nil
 
-  defp maybe_deliver_webhook(:stream, _job, _payload), do: :ok
-
-  defp maybe_deliver_webhook(_mode, job, payload) do
-    AccountQueueRegistry.enqueue_webhook(
+  defp webhook_delivery(_mode, job, payload) do
+    Job.new_webhook_delivery(
       job.id,
       job.user_id,
       job.webhook_url,
@@ -1049,6 +1050,11 @@ defmodule Spillway.AccountQueue do
       Job.webhook_max_retries(job)
     )
   end
+
+  defp maybe_enqueue_webhook(:inserted, delivery),
+    do: AccountQueueRegistry.enqueue_delivery(delivery)
+
+  defp maybe_enqueue_webhook(_outcome, _delivery), do: :ok
 
   @doc "Maximum queued plus in-flight jobs accepted for one user; 0 disables the ceiling."
   def max_pending_per_user do
