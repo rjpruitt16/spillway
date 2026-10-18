@@ -62,7 +62,13 @@ defmodule Spillway.AccountQueue do
     # expire_queued_jobs/1 runs on every :process_next; without this it
     # copied and filtered the whole queue each time, which grew
     # quadratically once a backlog built up.
-    next_deadline: nil
+    next_deadline: nil,
+    # Each dispatched job's runner process, by pid, so a runner that dies
+    # mid-job gives its slot back and its job a retry or a failure. Runners
+    # used to be unmonitored: one that crashed left its slot counted in
+    # flight and its job unfinished in the store, out of the queue, until
+    # the node restarted (soak run 3l: about 2,000 such jobs after a peak).
+    runners: %{}
   ]
 
   # ---- Public API ----
@@ -330,11 +336,12 @@ defmodule Spillway.AccountQueue do
   # the failed response advertised, if that's lower), and send the job back
   # to ourselves after its backoff.
   @impl true
-  def handle_call({:job_retry, %Job{} = job, delay_ms, rps_header}, _from, state) do
+  def handle_call({:job_retry, %Job{} = job, delay_ms, rps_header}, from, state) do
     Process.send_after(self(), {:requeue, job}, delay_ms)
 
     new_state =
       state
+      |> forget_runner(from)
       |> penalize_rps(rps_header)
       |> Map.put(:in_flight, max(state.in_flight - 1, 0))
       |> Map.update!(:waiting, &(&1 + 1))
@@ -345,9 +352,10 @@ defmodule Spillway.AccountQueue do
 
   # A final failure after a retryable error still slows the queue down.
   @impl true
-  def handle_call({:job_failed, user_id, rps_header}, _from, state) do
+  def handle_call({:job_failed, user_id, rps_header}, from, state) do
     new_state =
       state
+      |> release_runner(from)
       |> penalize_rps(rps_header)
       |> Map.put(:in_flight, max(state.in_flight - 1, 0))
 
@@ -361,12 +369,12 @@ defmodule Spillway.AccountQueue do
   def handle_call(
         {:job_done, user_id, rps_header, max_concurrent_header, account_queue_header,
          slow_start_header, max_backlog_header},
-        _from,
+        from,
         state
       ) do
     new_state =
       apply_job_done(
-        state,
+        release_runner(state, from),
         rps_header,
         max_concurrent_header,
         account_queue_header,
@@ -485,6 +493,17 @@ defmodule Spillway.AccountQueue do
     new_state = if was_empty, do: schedule_position_broadcast(new_state), else: new_state
     send(self(), :process_next)
     {:noreply, new_state, arm_idle_timeout()}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
+    case Map.pop(state.runners, pid) do
+      {nil, _} ->
+        {:noreply, state, arm_idle_timeout()}
+
+      {runner, runners} ->
+        {:noreply, runner_down(%{state | runners: runners}, runner, reason), arm_idle_timeout()}
+    end
   end
 
   @impl true
@@ -622,12 +641,24 @@ defmodule Spillway.AccountQueue do
         queue_key = state.queue_key
 
         # spawn, not Task.start: Task.start reads this process's info for
-        # caller metadata. Nothing awaits these.
-        spawn(fn ->
-          execute(job, dispatch_url, parent, rps, max_concurrent, queue_key, pool_pid, member_id)
-        end)
+        # caller metadata. Nothing awaits these; the monitor is for
+        # runner_down/3.
+        {pid, ref} =
+          spawn_monitor(fn ->
+            execute(
+              job,
+              dispatch_url,
+              parent,
+              rps,
+              max_concurrent,
+              queue_key,
+              pool_pid,
+              member_id
+            )
+          end)
 
-        {:dispatched, new_state}
+        runner = %{ref: ref, job: job, dispatch_url: dispatch_url, released: false}
+        {:dispatched, %{new_state | runners: Map.put(new_state.runners, pid, runner)}}
     end
   end
 
@@ -865,7 +896,8 @@ defmodule Spillway.AccountQueue do
 
         GenServer.call(
           parent,
-          {:job_done, job.user_id, rps, max_concurrent, account_queue, slow_start, max_backlog}
+          {:job_done, job.user_id, rps, max_concurrent, account_queue, slow_start, max_backlog},
+          :infinity
         )
 
         UserLoad.done(job)
@@ -930,20 +962,102 @@ defmodule Spillway.AccountQueue do
              }}
           )
 
-          GenServer.call(parent, {:job_retry, retried, delay_ms, rps_header})
+          GenServer.call(parent, {:job_retry, retried, delay_ms, rps_header}, :infinity)
         else
           reason =
             if Job.retries_left?(job), do: "retry_window_exhausted: " <> reason, else: reason
 
-          GenServer.call(parent, {:job_failed, job.user_id, rps_header})
+          GenServer.call(parent, {:job_failed, job.user_id, rps_header}, :infinity)
           fail_job(job, upstream, reason, response)
         end
 
       {:error, reason, response} ->
-        GenServer.call(parent, {:job_done, job.user_id, nil, nil, nil, nil, nil})
+        GenServer.call(parent, {:job_done, job.user_id, nil, nil, nil, nil, nil}, :infinity)
         fail_job(job, upstream, reason, response)
     end
   end
+
+  # The runner has handed its result back and freed its slot; it stays
+  # monitored until it exits, because it still has the job to finish.
+  defp release_runner(state, {pid, _tag}) do
+    case state.runners do
+      %{^pid => runner} ->
+        %{state | runners: Map.put(state.runners, pid, %{runner | released: true})}
+
+      _ ->
+        state
+    end
+  end
+
+  # A runner whose job went back to wait for a retry has nothing left to
+  # finish, and its job is not stuck while the store says it's unfinished.
+  defp forget_runner(state, {pid, _tag}) do
+    case Map.pop(state.runners, pid) do
+      {nil, _} ->
+        state
+
+      {runner, runners} ->
+        Process.demonitor(runner.ref, [:flush])
+        %{state | runners: runners}
+    end
+  end
+
+  defp runner_down(state, _runner, :normal), do: state
+
+  # Died after freeing its slot, somewhere in finishing the job. If the job
+  # never got finished, fail it so it doesn't wait for a restart.
+  defp runner_down(state, %{released: true, job: job} = runner, reason) do
+    upstream = Metrics.upstream(job.pool_id || runner.dispatch_url)
+
+    spawn(fn ->
+      if IdempotentStore.get_status(job.id) in ["queued", "in_flight"] do
+        Logger.warning("job #{job.id}: runner exited before finishing: #{inspect(reason)}")
+        fail_job(job, upstream, runner_exit_reason(reason), nil)
+      end
+    end)
+
+    state
+  end
+
+  # Died holding its slot: before or during the upstream call, or while
+  # handing back the result. Free the slot and treat it like a retryable
+  # failure. A retry may repeat an upstream call that already went out, the
+  # same at-least-once a node restart gives; counting it as an attempt
+  # stops a job that kills every runner from retrying forever.
+  defp runner_down(state, %{job: job} = runner, reason) do
+    Logger.warning("job #{job.id}: runner exited mid-job: #{inspect(reason)}")
+    delay_ms = retry_delay_ms(Job.attempts(job), %{})
+
+    retry? =
+      Job.retries_left?(job) and
+        System.system_time(:millisecond) + delay_ms < Job.retry_deadline_ms(job)
+
+    held_slot? = state.in_flight > 0
+    state = %{state | in_flight: max(state.in_flight - 1, 0)}
+    queue = self()
+    send(queue, :process_next)
+
+    if retry? do
+      retried = %{job | attempts: Job.attempts(job) + 1}
+
+      # The store write goes in its own process, and the requeue waits for
+      # it, so the retry is on disk before the job can run again.
+      spawn(fn ->
+        IdempotentStore.record_retry(retried)
+        Process.send_after(queue, {:requeue, retried}, delay_ms)
+      end)
+
+      %{state | waiting: state.waiting + 1}
+    else
+      if held_slot?, do: backlog_add(-1)
+      upstream = Metrics.upstream(job.pool_id || runner.dispatch_url)
+      spawn(fn -> fail_job(job, upstream, runner_exit_reason(reason), nil) end)
+      complete_user_job(state, job.user_id)
+    end
+  end
+
+  defp runner_exit_reason(reason),
+    do: "job_runner_exited: " <> String.slice(inspect(reason), 0, 200)
 
   defp fail_job(job, upstream, reason, response) do
     UserLoad.done(job)
