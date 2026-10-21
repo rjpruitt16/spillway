@@ -28,3 +28,27 @@ defmodule Spillway.JobOptionalWebhookTest do
     assert Job.webhook_delivery_job?(%Job{kind: nil, webhook_url: ""})
   end
 end
+
+defmodule Spillway.JobOptionalWebhookStoreTest do
+  # The store is shared application state.
+  use ExUnit.Case, async: false
+
+  alias Spillway.{IdempotentStore, Job}
+
+  test "a stored job without webhook_url reads back as a user job, not a webhook delivery" do
+    {:ok, job} =
+      Job.new(%{
+        "user_id" => "user-1",
+        "idempotent_key" => "no-webhook-#{System.unique_integer([:positive])}",
+        "url" => "https://example.com/webhook",
+        "method" => "POST"
+      })
+
+    :ok = IdempotentStore.check_or_insert(job)
+    stored = IdempotentStore.get_job(job.id)
+
+    assert stored.webhook_url == nil
+    assert stored.kind == :user
+    refute Job.webhook_delivery_job?(stored)
+  end
+end
