@@ -20,10 +20,20 @@ defmodule Spillway.FullnessTest do
 
     for key <- @limits, do: System.put_env(key, "0")
 
+    # Earlier integration-style tests can leave upstream settings in the
+    # application-owned ETS table while their queues finish shutting down.
+    # Fullness is global, so isolate this module from that unrelated state.
+    Intake.ensure_tables()
+    settings = :ets.match_object(:ez_queues, {{:settings, :_}, :_, :_})
+    Enum.each(settings, &:ets.delete_object(:ez_queues, &1))
+
     on_exit(fn ->
       for {key, value} <- prev do
         if value, do: System.put_env(key, value), else: System.delete_env(key)
       end
+
+      # insert_new: a queue that republished its setting meanwhile keeps its newer value.
+      Enum.each(settings, &:ets.insert_new(:ez_queues, &1))
     end)
 
     :ok

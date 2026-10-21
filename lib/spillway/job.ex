@@ -23,7 +23,8 @@ defmodule Spillway.Job do
           method: String.t(),
           headers: map(),
           body: String.t() | nil,
-          webhook_url: String.t(),
+          webhook_url: String.t() | nil,
+          kind: :user | :webhook_delivery | nil,
           status: status(),
           created_at: integer(),
           execute_before: integer() | nil,
@@ -45,6 +46,7 @@ defmodule Spillway.Job do
     :headers,
     :body,
     :webhook_url,
+    :kind,
     status: :queued,
     max_retries: 4,
     webhook_max_retries: nil,
@@ -66,6 +68,7 @@ defmodule Spillway.Job do
   def new(params) do
     url = blank_to_nil(Map.get(params, "url"))
     pool_id = blank_to_nil(Map.get(params, "pool_id"))
+    webhook_url = blank_to_nil(Map.get(params, "webhook_url"))
 
     with {:ok, user_id} <- require_field(params, "user_id"),
          :ok <- reject_nul(user_id),
@@ -75,7 +78,6 @@ defmodule Spillway.Job do
            parse_webhook_max_retries(Map.get(params, "webhook_max_retries")),
          :ok <- require_exactly_one_of_url_or_pool_id(url, pool_id),
          {:ok, method} <- require_field(params, "method"),
-         {:ok, webhook_url} <- require_field(params, "webhook_url"),
          {:ok, idempotent_key} <- require_field(params, "idempotent_key"),
          {:ok, execute_before} <- parse_execute_before(Map.get(params, "execute_before")) do
       {:ok,
@@ -92,6 +94,7 @@ defmodule Spillway.Job do
          headers: Map.get(params, "headers", %{}),
          body: Map.get(params, "body"),
          webhook_url: webhook_url,
+         kind: :user,
          status: :queued,
          created_at: System.system_time(:millisecond),
          execute_before: execute_before,
@@ -247,9 +250,9 @@ defmodule Spillway.Job do
   Builds a Job representing a webhook delivery attempt itself, for
   AccountQueueRegistry.enqueue_webhook/4 to push webhook delivery through
   the same account-queue pacing as forward dispatch instead of firing
-  immediately with a fixed retry schedule. webhook_url is "" on the
-  resulting job (see webhook_delivery_job?/1), never nil, so it always
-  matches the same check regardless of how the field ends up compared.
+  immediately with a fixed retry schedule. kind explicitly separates this
+  internal job from a user job that chooses not to request a completion
+  webhook.
 
   original_job_id scopes the idempotent key so a given job's webhook is
   enqueued at most once even if this is somehow called twice for it.
@@ -272,6 +275,7 @@ defmodule Spillway.Job do
       headers: %{"Content-Type" => "application/json"},
       body: Jason.encode!(payload),
       webhook_url: "",
+      kind: :webhook_delivery,
       status: :queued,
       created_at: System.system_time(:millisecond)
     }
@@ -280,13 +284,16 @@ defmodule Spillway.Job do
   @doc """
   Reports whether this job represents a webhook delivery attempt itself
   (see new_webhook_delivery/4), as opposed to a regular user-submitted
-  job. A regular job always has a non-empty webhook_url -- new/1 requires
-  one -- so an empty webhook_url is a safe, already-enforced signal rather
-  than a separate field: it's what AccountQueue checks to avoid
-  enqueueing a webhook-about-a-webhook, and what make_request checks to
-  decide whether to L8-sign the outbound request.
+  job. Records written before kind existed used an empty webhook_url only
+  for these internal jobs, so that remains the backward-compatible fallback.
   """
-  def webhook_delivery_job?(%__MODULE__{webhook_url: url}), do: url in [nil, ""]
+  def webhook_delivery_job?(job) do
+    case Map.get(job, :kind) do
+      :webhook_delivery -> true
+      :user -> false
+      nil -> Map.get(job, :webhook_url) in [nil, ""]
+    end
+  end
 
   @doc """
   Rebuilds a job read back from the store as the current struct. Records written
