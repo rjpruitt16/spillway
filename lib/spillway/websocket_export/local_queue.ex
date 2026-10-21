@@ -14,29 +14,51 @@ defmodule Spillway.WebSocketExport.LocalQueue do
   @counters {__MODULE__, :counters}
   # counters: 1 = next sequence, 2 = entries pending (approximate)
 
-  @doc "Sets the sequence after the newest queued entry. Called at boot."
+  @doc """
+  Brings the counters up to date with the store. Safe to call on every
+  exporter start: the atomics are created once and kept, so sessions that
+  are appending during a restart keep drawing unique sequences, and the
+  next sequence only ever moves forward.
+  """
   def init! do
-    ref = :atomics.new(2, signed: false)
+    ref = counters()
 
     case Store.last(:ws_export) do
-      {<<last::unsigned-big-64>>, _value} -> :atomics.put(ref, 1, last + 1)
-      nil -> :atomics.put(ref, 1, 1)
+      {<<last::unsigned-big-64>>, _value} -> advance_to(ref, last + 1)
+      nil -> advance_to(ref, 1)
     end
 
-    estimate =
-      case Store.property(:ws_export, "rocksdb.estimate-num-keys") do
-        nil -> 0
-        value -> String.to_integer(to_string(value))
-      end
-
-    :atomics.put(ref, 2, estimate)
-    :persistent_term.put(@counters, ref)
+    # Exact, not RocksDB's estimate: deletes leave the estimate high until
+    # compaction, and enforce_cap would then drop entries still under the cap.
+    :atomics.put(ref, 2, Store.count(:ws_export))
     :ok
+  end
+
+  defp counters do
+    case :persistent_term.get(@counters, nil) do
+      nil ->
+        ref = :atomics.new(2, signed: false)
+        :atomics.put(ref, 1, 1)
+        :persistent_term.put(@counters, ref)
+        ref
+
+      ref ->
+        ref
+    end
+  end
+
+  # Raises the next sequence to at least floor, never lowering it.
+  defp advance_to(ref, floor) do
+    current = :atomics.get(ref, 1)
+
+    if current < floor and :atomics.compare_exchange(ref, 1, current, floor) != :ok,
+      do: advance_to(ref, floor),
+      else: :ok
   end
 
   @doc "The write op that queues one entry; goes in the transcript's batch."
   def op(session_id, stream_id, direction, envelope, recorded_at) do
-    ref = :persistent_term.get(@counters)
+    ref = counters()
     sequence = :atomics.add_get(ref, 1, 1) - 1
     :atomics.add(ref, 2, 1)
 
@@ -54,11 +76,11 @@ defmodule Spillway.WebSocketExport.LocalQueue do
 
   def ack(keys) do
     Store.write(Enum.map(keys, &{:delete, :ws_export, &1}))
-    :atomics.sub(:persistent_term.get(@counters), 2, min(length(keys), pending()))
+    :atomics.sub(counters(), 2, min(length(keys), pending()))
     :ok
   end
 
-  def pending, do: :atomics.get(:persistent_term.get(@counters), 2)
+  def pending, do: :atomics.get(counters(), 2)
 
   @doc """
   Drops the oldest entries beyond max_pending, so a receiver outage can't
@@ -69,16 +91,16 @@ defmodule Spillway.WebSocketExport.LocalQueue do
     excess = pending() - max_pending
 
     if excess > 0 do
-      case read(excess) do
+      # Keys only: the dropped values never need decoding.
+      case Store.keys_from(:ws_export, <<0::unsigned-big-64>>, excess) do
         [] ->
           0
 
-        entries ->
-          {first, _} = hd(entries)
-          {<<last::unsigned-big-64>>, _} = List.last(entries)
-          Store.delete_range(:ws_export, first, <<last + 1::unsigned-big-64>>)
-          :atomics.sub(:persistent_term.get(@counters), 2, min(length(entries), pending()))
-          length(entries)
+        keys ->
+          <<last::unsigned-big-64>> = List.last(keys)
+          Store.delete_range(:ws_export, hd(keys), <<last + 1::unsigned-big-64>>)
+          :atomics.sub(counters(), 2, min(length(keys), pending()))
+          length(keys)
       end
     else
       0

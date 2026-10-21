@@ -171,6 +171,8 @@ defmodule Spillway.WebSocketExport.Exporter do
 
   defp local_entry({key, _other}), do: {key, nil}
 
+  defp valkey_entry({id, nil}), do: {id, nil}
+
   defp valkey_entry({id, fields}) do
     with session_id when is_binary(session_id) <- fields["session_id"],
          {:ok, envelope} <- Jason.decode(fields["envelope"] || ""),

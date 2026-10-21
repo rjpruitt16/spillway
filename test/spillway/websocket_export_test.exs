@@ -198,6 +198,23 @@ defmodule Spillway.WebSocketExportTest do
     refute Map.has_key?(event, "payload")
   end
 
+  test "restarting the queue never hands out a sequence twice, and counts exactly" do
+    LocalQueue.init!()
+    {:put, :ws_export, <<first::64>>, _} = LocalQueue.op("s", "1-1", "client", %{}, 1)
+    # A session drew a sequence but its write hasn't landed yet when the
+    # exporter restarts: the next sequence must still move past it.
+    LocalQueue.init!()
+    {:put, :ws_export, <<second::64>>, _} = LocalQueue.op("s", "1-2", "client", %{}, 2)
+    assert second > first
+
+    WebSocketExport.set_enabled(%{max_pending: 1000})
+    for i <- 1..5, do: append("export-count", "command", "c#{i}")
+    [{key, _} | _] = LocalQueue.read(10)
+    LocalQueue.ack([key])
+    LocalQueue.init!()
+    assert LocalQueue.pending() == 4, "the count after a restart is exact, not RocksDB's estimate"
+  end
+
   test "without export, appends queue nothing" do
     WebSocketExport.set_enabled(false)
     append("export-off", "command", "o1")

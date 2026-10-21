@@ -84,6 +84,48 @@ defmodule Spillway.WebSocketExportValkeyTest do
            "a stopped exporter with nothing pending leaves the group"
   end
 
+  test "a pending entry trimmed from the stream is acknowledged, not left pending", %{
+    admin: admin
+  } do
+    key = ValkeyQueue.key()
+    Redix.command!(admin, ["XGROUP", "CREATE", key, "spillway-export", "0", "MKSTREAM"])
+    Redix.command!(admin, ["XADD", key, "*", "session_id", "s", "stream_id", "1-1"])
+    # A consumer that went away read it (so it's pending), then MAXLEN trimmed it.
+    Redix.command!(admin, [
+      "XREADGROUP",
+      "GROUP",
+      "spillway-export",
+      "gone-node",
+      "STREAMS",
+      key,
+      ">"
+    ])
+
+    Redix.command!(admin, ["XTRIM", key, "MAXLEN", "0"])
+
+    port = Enum.random(20_000..60_000)
+    start_supervised!({Bandit, plug: {Receiver, self()}, port: port})
+    # Claim immediately instead of waiting the usual minute of idleness.
+    Application.put_env(:spillway, :ws_export_claim_idle_ms, 0)
+    on_exit(fn -> Application.delete_env(:spillway, :ws_export_claim_idle_ms) end)
+
+    start_supervised!(
+      {Exporter,
+       %WebSocketExport{enabled: true, url: "http://127.0.0.1:#{port}/b", max_pending: 1000}}
+    )
+
+    assert eventually(
+             fn ->
+               {:ok, conn} = Redix.start_link(@url)
+               [count | _] = Redix.command!(conn, ["XPENDING", key, "spillway-export"])
+               Redix.stop(conn)
+               count == 0
+             end,
+             4_000
+           ),
+           "the trimmed entry should leave the pending list"
+  end
+
   defp receive_events(want, acc) do
     if length(acc) >= want do
       acc

@@ -14,7 +14,6 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
 
   @key "spillway:ws:export"
   @group "spillway-export"
-  @claim_idle_ms 60_000
   @stale_consumer_ms 3_600_000
 
   def key, do: @key
@@ -82,7 +81,9 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
       @key,
       @group,
       consumer,
-      Integer.to_string(@claim_idle_ms),
+      # Entries another consumer left unacknowledged this long are taken
+      # over (a minute; tests lower it).
+      Integer.to_string(Application.get_env(:spillway, :ws_export_claim_idle_ms, 60_000)),
       "0-0",
       "COUNT",
       Integer.to_string(limit)
@@ -100,10 +101,14 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
     end
   end
 
-  # Deleted entries come back from XAUTOCLAIM as nil; skip them.
+  # A pending entry trimmed from the stream (MAXLEN) comes back with no
+  # fields. It's returned as {id, nil} so the exporter acknowledges it;
+  # skipping it would leave it in the pending list forever.
   defp decode_entries(entries) do
-    for [id, fields] <- entries, is_list(fields) do
-      {id, fields |> Enum.chunk_every(2) |> Map.new(fn [k, v] -> {k, v} end)}
+    for [id, fields] <- entries do
+      if is_list(fields),
+        do: {id, fields |> Enum.chunk_every(2) |> Map.new(fn [k, v] -> {k, v} end)},
+        else: {id, nil}
     end
   end
 
