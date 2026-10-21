@@ -126,6 +126,80 @@ defmodule Spillway.WebSocketExportValkeyTest do
            "the trimmed entry should leave the pending list"
   end
 
+  test "a stale entry deep in the pending list is still claimed", %{admin: admin} do
+    key = ValkeyQueue.key()
+    {:ok, conn} = Redix.start_link(@url)
+    :ok = ValkeyQueue.ensure_group(conn)
+    Redix.stop(conn)
+
+    add = fn id ->
+      Redix.command!(admin, [
+        "XADD",
+        key,
+        "*",
+        "session_id",
+        "s",
+        "stream_id",
+        "1-#{id}",
+        "direction",
+        "client",
+        "envelope",
+        Jason.encode!(%{"type" => "command", "message_id" => id}),
+        "recorded_at",
+        "1"
+      ])
+    end
+
+    read_as = fn consumer, count ->
+      Redix.command!(admin, [
+        "XREADGROUP",
+        "GROUP",
+        "spillway-export",
+        consumer,
+        "COUNT",
+        "#{count}",
+        "STREAMS",
+        key,
+        ">"
+      ])
+    end
+
+    # 50 entries a live node is still working on (fresh, so not claimable),
+    # then one a departed node left two minutes ago. With a batch of 1,
+    # XAUTOCLAIM scans about 10 pending entries per call, so the stale entry
+    # is only reached if each scan resumes where the last one stopped.
+    for i <- 1..50, do: add.("busy-#{i}")
+    read_as.("busy-node", 50)
+    stale = add.("stale")
+    read_as.("gone-node", 1)
+
+    Redix.command!(admin, [
+      "XCLAIM",
+      key,
+      "spillway-export",
+      "gone-node",
+      "0",
+      stale,
+      "IDLE",
+      "120000"
+    ])
+
+    port = Enum.random(20_000..60_000)
+    start_supervised!({Bandit, plug: {Receiver, self()}, port: port})
+
+    start_supervised!(
+      {Exporter,
+       %WebSocketExport{
+         enabled: true,
+         url: "http://127.0.0.1:#{port}/b",
+         max_pending: 1000,
+         batch: 1
+       }}
+    )
+
+    assert_receive {:batch, %{"events" => [%{"message_id" => "stale"}]}}, 20_000
+  end
+
   defp receive_events(want, acc) do
     if length(acc) >= want do
       acc

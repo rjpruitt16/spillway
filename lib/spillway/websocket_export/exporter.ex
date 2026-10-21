@@ -50,7 +50,8 @@ defmodule Spillway.WebSocketExport.Exporter do
         limit: config.batch,
         successes: 0,
         backoff_ms: 1_000,
-        last_sweep: 0
+        last_sweep: 0,
+        claim_cursor: "0-0"
       }
 
       # Only now: without the queue (and Valkey's group), appends would fill
@@ -145,10 +146,10 @@ defmodule Spillway.WebSocketExport.Exporter do
 
   defp export_once(state) do
     case read(state) do
-      {:ok, []} ->
+      {:ok, [], state} ->
         {:sent, 0, state}
 
-      {:ok, entries} ->
+      {:ok, entries, state} ->
         {events, ids} = fill_batch(entries, state.config)
         send_batch(events, ids, state)
 
@@ -157,12 +158,13 @@ defmodule Spillway.WebSocketExport.Exporter do
     end
   end
 
-  defp read(%{backend: :local, limit: limit}),
-    do: {:ok, LocalQueue.read(limit) |> Enum.map(&local_entry/1)}
+  defp read(%{backend: :local, limit: limit} = state),
+    do: {:ok, LocalQueue.read(limit) |> Enum.map(&local_entry/1), state}
 
   defp read(%{backend: {:valkey, conn}} = state) do
-    with {:ok, entries} <- ValkeyQueue.read(conn, state.consumer, state.limit, 1_000) do
-      {:ok, Enum.map(entries, &valkey_entry/1)}
+    with {:ok, entries, cursor} <-
+           ValkeyQueue.read(conn, state.consumer, state.limit, 1_000, state.claim_cursor) do
+      {:ok, Enum.map(entries, &valkey_entry/1), %{state | claim_cursor: cursor}}
     end
   end
 

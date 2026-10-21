@@ -44,12 +44,30 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
   @doc """
   The next entries for this consumer: its own unacknowledged ones first,
   then ones another consumer left for over a minute, then new ones (waiting
-  up to block_ms). Returns {:ok, [{id, entry}]}.
+  up to block_ms). Returns {:ok, [{id, entry}], next_cursor}.
+
+  cursor is where the stale-entry scan resumes. XAUTOCLAIM looks at only
+  about 10 x limit pending entries per call, so restarting from "0-0" every
+  time would never reach entries further down the pending list. The caller
+  passes back the cursor it got; the scan wraps to "0-0" when it ends.
   """
-  def read(conn, consumer, limit, block_ms) do
-    with {:ok, []} <- read_group(conn, consumer, "0", limit, nil),
-         {:ok, []} <- claim_stale(conn, consumer, limit) do
-      read_group(conn, consumer, ">", limit, block_ms)
+  def read(conn, consumer, limit, block_ms, cursor \\ "0-0") do
+    case read_group(conn, consumer, "0", limit, nil) do
+      {:ok, []} ->
+        case claim_stale(conn, consumer, limit, cursor) do
+          {:ok, [], next} ->
+            with {:ok, entries} <- read_group(conn, consumer, ">", limit, block_ms),
+                 do: {:ok, entries, next}
+
+          other ->
+            other
+        end
+
+      {:ok, entries} ->
+        {:ok, entries, cursor}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -75,7 +93,7 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
     end
   end
 
-  defp claim_stale(conn, consumer, limit) do
+  defp claim_stale(conn, consumer, limit, cursor) do
     command = [
       "XAUTOCLAIM",
       @key,
@@ -84,17 +102,17 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
       # Entries another consumer left unacknowledged this long are taken
       # over (a minute; tests lower it).
       Integer.to_string(Application.get_env(:spillway, :ws_export_claim_idle_ms, 60_000)),
-      "0-0",
+      cursor,
       "COUNT",
       Integer.to_string(limit)
     ]
 
     case Redix.command(conn, command) do
-      {:ok, [_next, entries | _]} ->
-        {:ok, decode_entries(entries)}
+      {:ok, [next, entries | _]} ->
+        {:ok, decode_entries(entries), next}
 
       {:error, %Redix.Error{message: "NOGROUP" <> _}} ->
-        with :ok <- ensure_group(conn), do: {:ok, []}
+        with :ok <- ensure_group(conn), do: {:ok, [], "0-0"}
 
       {:error, reason} ->
         {:error, reason}
@@ -117,9 +135,20 @@ defmodule Spillway.WebSocketExport.ValkeyQueue do
   def ack(conn, ids) do
     commands = [["MULTI"], ["XACK", @key, @group | ids], ["XDEL", @key | ids], ["EXEC"]]
 
+    # A command that fails inside MULTI/EXEC comes back as a %Redix.Error{}
+    # reply, not as {:error, _}, so check every reply.
     case Redix.pipeline(conn, commands) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+      {:ok, [_multi, _queued_ack, _queued_del, [_acked, _deleted]] = replies} ->
+        case Enum.find(List.flatten(replies), &match?(%Redix.Error{}, &1)) do
+          nil -> :ok
+          error -> {:error, error}
+        end
+
+      {:ok, replies} ->
+        {:error, {:unexpected_ack_replies, replies}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
