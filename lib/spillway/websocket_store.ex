@@ -8,7 +8,7 @@ defmodule Spillway.WebSocketStore do
 
   require Logger
 
-  alias Spillway.{Store, WebSocketBudget, WebSocketConfig}
+  alias Spillway.{Store, WebSocketBudget, WebSocketConfig, WebSocketExport}
   alias Spillway.WebSocketStore.Valkey
 
   @owners Spillway.WebSocketStreamOwners
@@ -86,7 +86,14 @@ defmodule Spillway.WebSocketStore do
 
   def append(session_id, direction, envelope) when direction in ["client", "backend"] do
     if Valkey.enabled?(),
-      do: Valkey.append(hash_session(session_id), direction, envelope, WebSocketConfig.load()),
+      do:
+        Valkey.append(
+          hash_session(session_id),
+          direction,
+          envelope,
+          WebSocketConfig.load(),
+          session_id
+        ),
       else: append_local(session_id, direction, envelope)
   end
 
@@ -100,17 +107,27 @@ defmodule Spillway.WebSocketStore do
     expires_at = now + config.stream_ttl_ms
     oldest = prune_for_limit(session_hash, epoch, oldest_sequence, sequence, config)
     value = {direction, envelope, now}
+    stream_id = format_cursor(epoch, sequence)
 
-    Store.write([
-      {:put, :ws_events, event_key(session_hash, epoch, sequence), value},
-      {:put, :ws_streams, session_hash, {epoch, sequence, oldest, sequence, expires_at}}
-    ])
+    # With export on, the export copy goes in the same batch, so a recorded
+    # message is always exported (Spillway.WebSocketExport).
+    export =
+      if WebSocketExport.enabled?(),
+        do: [WebSocketExport.LocalQueue.op(session_id, stream_id, direction, envelope, now)],
+        else: []
+
+    Store.write(
+      [
+        {:put, :ws_events, event_key(session_hash, epoch, sequence), value},
+        {:put, :ws_streams, session_hash, {epoch, sequence, oldest, sequence, expires_at}}
+      ] ++ export
+    )
 
     count_appended(:erlang.external_size(value))
 
     {:ok,
      %{
-       stream_id: format_cursor(epoch, sequence),
+       stream_id: stream_id,
        direction: direction,
        envelope: envelope,
        recorded_at: now

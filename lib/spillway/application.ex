@@ -33,6 +33,7 @@ defmodule Spillway.Application do
     # queues once the node is up.
     recovered = Spillway.IdempotentStore.recoverable_jobs()
 
+    # Off unless SPILLWAY_WS_EXPORT_ENABLED=true.
     children =
       [
         # Opened in ensure_schema! above; this process syncs its log and
@@ -61,7 +62,10 @@ defmodule Spillway.Application do
         Spillway.WebSocketStore.Valkey.child_specs() ++
         [
           {Registry, keys: :unique, name: Spillway.WebSocketStreamOwners},
-          {Spillway.WebSocketStore, websocket_config},
+          {Spillway.WebSocketStore, websocket_config}
+        ] ++
+        Spillway.WebSocketExport.Exporter.child_specs() ++
+        [
           {Spillway.WebSocketQueue, websocket_config},
           {Registry, keys: :unique, name: Spillway.WebSocketSessionRegistry},
           Spillway.WebSocketSessionSupervisor,

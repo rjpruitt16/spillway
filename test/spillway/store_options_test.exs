@@ -20,8 +20,8 @@ defmodule Spillway.StoreOptionsTest do
     text = File.read!(options)
     sections = text |> String.split(~r/^\[CFOptions /m) |> tl()
 
-    # default plus the nine named column families
-    assert length(sections) == 10
+    # default plus the ten named column families
+    assert length(sections) == 11
 
     for section <- sections do
       [name | _] = String.split(section, "\n", parts: 2)
@@ -32,7 +32,7 @@ defmodule Spillway.StoreOptionsTest do
     assert text =~ ~r/^\s*keep_log_file_num=5$/m
 
     tables = text |> String.split(~r/^\[TableOptions\/BlockBasedTable /m) |> tl()
-    assert length(tables) == 10
+    assert length(tables) == 11
 
     for table <- tables do
       [name | _] = String.split(table, "\n", parts: 2)

@@ -30,7 +30,7 @@ defmodule Spillway.Store do
 
   require Logger
 
-  @column_families ~w(jobs keys results delivery drain_events meta expiry ws_streams ws_events)a
+  @column_families ~w(jobs keys results delivery drain_events meta expiry ws_streams ws_events ws_export)a
   @default_sync_interval_ms 100
 
   # Small write buffers: with RocksDB's 64MB default, nine column families
@@ -188,6 +188,54 @@ defmodule Spillway.Store do
   end
 
   defp take(_it, _end, _limit, _keep?, acc), do: Enum.reverse(acc)
+
+  @doc "How many keys a column family holds, counted exactly (values aren't decoded)."
+  def count(cf) do
+    {:ok, it} = :rocksdb.iterator(db(), cf(cf), [])
+
+    try do
+      count_from(it, :rocksdb.iterator_move(it, :first), 0)
+    after
+      :rocksdb.iterator_close(it)
+    end
+  end
+
+  defp count_from(it, {:ok, _key, _value}, n),
+    do: count_from(it, :rocksdb.iterator_move(it, :next), n + 1)
+
+  defp count_from(_it, _end, n), do: n
+
+  @doc "Up to `limit` keys from `from` onwards, in key order, without decoding values."
+  def keys_from(cf, from, limit) do
+    {:ok, it} = :rocksdb.iterator(db(), cf(cf), [])
+
+    try do
+      collect_keys(it, :rocksdb.iterator_move(it, {:seek, from}), limit, [])
+    after
+      :rocksdb.iterator_close(it)
+    end
+  end
+
+  defp collect_keys(_it, _moved, 0, acc), do: Enum.reverse(acc)
+
+  defp collect_keys(it, {:ok, key, _value}, limit, acc),
+    do: collect_keys(it, :rocksdb.iterator_move(it, :next), limit - 1, [key | acc])
+
+  defp collect_keys(_it, _end, _limit, acc), do: Enum.reverse(acc)
+
+  @doc "The last `{key, value}` in a column family, or nil when it's empty."
+  def last(cf) do
+    {:ok, it} = :rocksdb.iterator(db(), cf(cf), [])
+
+    try do
+      case :rocksdb.iterator_move(it, :last) do
+        {:ok, key, value} -> {key, :erlang.binary_to_term(value)}
+        _ -> nil
+      end
+    after
+      :rocksdb.iterator_close(it)
+    end
+  end
 
   @doc "Deletes every key in every column family."
   def clear(cfs \\ @column_families) do

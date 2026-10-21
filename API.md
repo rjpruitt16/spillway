@@ -208,7 +208,44 @@ The transcript is a **replay window**, not a durable log. It is built for reconn
 - **Not guaranteed:** history older than the window. The window shrinks under load: per-session retention, the TTL, and the node's transcript budget all trim the oldest events. A client whose cursor points before them is closed or gets **409** and must resynchronize from your application's own state. Spillway never skips events silently, but it does not keep them forever.
 - **Storage is this node's RocksDB store** (or Valkey with `SPILLWAY_VALKEY_URL`). It survives a restart of the node, not the loss of its disk, and it is not replicated across nodes.
 
-If you need every message kept beyond the window (audit, analytics, replay from the beginning), record it in your own durable store from the backend, or follow the durable-transcript extension in the issue tracker.
+If you need every message kept beyond the window (audit, analytics, replay from the beginning), turn on transcript export below, or record messages in your own durable store from the backend.
+
+#### Keeping transcripts longer: export
+
+Off by default. With `SPILLWAY_WS_EXPORT_ENABLED=true`, Spillway copies every recorded message to a receiver you run, such as [Inlet](https://github.com/rjpruitt16/inlet), which writes them to a Kafka topic. It's the same mechanism and batch format as Aquifer's `AQUIFER_WS_EXPORT_*`, so the same receiver works for both. The transcript and its replay window don't change.
+
+- **Nothing recorded is missed.** Each message is also queued for export in the same atomic write as the transcript entry: one RocksDB batch with the local store, or one Lua script with Valkey. The copy carries the transcript entry's `stream_id`, the cursor clients replay from.
+- **Batches are deleted only after a 2xx.** An exporter process POSTs batches to `SPILLWAY_WS_EXPORT_URL`. A failed batch is retried with backoff.
+  - With Valkey, several nodes share one consumer group (`spillway-export`). A node that stops with nothing pending leaves it, and consumers of nodes that are gone are removed once idle for an hour.
+- **Delivery is at least once.** Drop repeats by `session_id` + `stream_id`.
+- **Order is kept within a batch, not across batches.** A retried batch can arrive after a newer one. Order a session's messages by `stream_id`.
+- **Batch size.** Batches are capped at `SPILLWAY_WS_EXPORT_MAX_BATCH_BYTES`. A **413** halves the batch until it goes through. A single message still refused with 413 is logged and skipped, so it can't block the queue.
+- **https only.** The URL must be `https`, so the token and transcripts aren't sent in cleartext. `http` is allowed for loopback, or anywhere with `SPILLWAY_WS_EXPORT_ALLOW_INSECURE=true` on a private network you trust. Redirects aren't followed. Otherwise export stays off and a warning is logged.
+- **A cap on the queue.** While the receiver is down, the queue holds up to `SPILLWAY_WS_EXPORT_MAX_PENDING` messages, approximately. Beyond that the oldest are dropped from export (logged); they stay in their transcripts for the replay window. The cap counts messages, not bytes, so allow store or Valkey space for `SPILLWAY_WS_EXPORT_MAX_PENDING` × average message size, or lower it.
+
+Batch body (`Content-Type: application/json`, `Authorization: Bearer <SPILLWAY_WS_EXPORT_TOKEN>` when set):
+
+```json
+{
+  "schema": "aquifer.websocket_batch.v1",
+  "node_id": "spillway-1",
+  "events": [
+    {"session_id": "4d9c...", "stream_id": "1792541234567-0", "direction": "client", "type": "command",
+     "message_id": "m-17", "payload": {"action": "subscribe"}, "recorded_at": 1792541234567}
+  ]
+}
+```
+
+| Env var | Default | Description |
+|---|---|---|
+| `SPILLWAY_WS_EXPORT_ENABLED` | `false` | Turns export on |
+| `SPILLWAY_WS_EXPORT_URL` | _(none)_ | Receiver for batches; export stays off without it |
+| `SPILLWAY_WS_EXPORT_TOKEN` | _(none)_ | Sent as a bearer token |
+| `SPILLWAY_WS_EXPORT_BATCH` | `500` | Messages per batch |
+| `SPILLWAY_WS_EXPORT_MAX_BATCH_BYTES` | `4194304` | Encoded size cap per batch (4 MiB, under Lambda's 6 MB request limit) |
+| `SPILLWAY_WS_EXPORT_MAX_PENDING` | `1000000` | Approximate cap on messages waiting for export |
+| `SPILLWAY_WS_EXPORT_PAYLOADS` | `true` | `false` exports everything but `payload` |
+| `SPILLWAY_WS_EXPORT_ALLOW_INSECURE` | `false` | Allow an `http` URL that isn't loopback |
 
 | Environment variable | Default |
 |---|---:|

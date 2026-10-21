@@ -48,34 +48,70 @@ defmodule Spillway.WebSocketStore.Valkey do
 
   defp key(session_hash), do: @prefix <> session_hash
 
-  def append(session_hash, direction, envelope, config) do
+  def append(session_hash, direction, envelope, config, session_id \\ nil) do
     now = System.system_time(:millisecond)
     key = key(session_hash)
 
-    commands = [
-      [
-        "XADD",
-        key,
-        "MAXLEN",
-        "~",
-        Integer.to_string(config.stream_max_events),
-        "*",
-        "direction",
-        direction,
-        "envelope",
-        Jason.encode!(envelope),
-        "recorded_at",
-        Integer.to_string(now)
-      ],
-      ["PEXPIRE", key, Integer.to_string(config.stream_ttl_ms)]
+    fields = [
+      "direction",
+      direction,
+      "envelope",
+      Jason.encode!(envelope),
+      "recorded_at",
+      Integer.to_string(now)
     ]
 
-    case Redix.pipeline(conn(session_hash), commands) do
-      {:ok, [id, _]} when is_binary(id) ->
-        {:ok, %{stream_id: id, direction: direction, envelope: envelope, recorded_at: now}}
+    result =
+      case Spillway.WebSocketExport.enabled?() do
+        %{max_pending: max_pending} when is_binary(session_id) ->
+          # One script writes the entry and its export copy, so a recorded
+          # message is always exported (Spillway.WebSocketExport). EVAL, not
+          # EVALSHA: Valkey may not have it cached (or restarted).
+          args = [
+            Integer.to_string(config.stream_max_events),
+            Integer.to_string(config.stream_ttl_ms),
+            Integer.to_string(max_pending),
+            session_id
+          ]
 
-      {:ok, [error | _]} ->
-        {:error, error}
+          case Redix.command(
+                 conn(session_hash),
+                 [
+                   "EVAL",
+                   Spillway.WebSocketExport.ValkeyQueue.append_script(),
+                   "2",
+                   key,
+                   Spillway.WebSocketExport.ValkeyQueue.key()
+                 ] ++ args ++ fields
+               ) do
+            {:ok, id} when is_binary(id) -> {:ok, id}
+            {:ok, other} -> {:error, other}
+            {:error, reason} -> {:error, reason}
+          end
+
+        _ ->
+          commands = [
+            [
+              "XADD",
+              key,
+              "MAXLEN",
+              "~",
+              Integer.to_string(config.stream_max_events),
+              "*" | fields
+            ],
+            ["PEXPIRE", key, Integer.to_string(config.stream_ttl_ms)]
+          ]
+
+          case Redix.pipeline(conn(session_hash), commands) do
+            {:ok, [id, _]} when is_binary(id) -> {:ok, id}
+            {:ok, [error | _]} -> {:error, error}
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case result do
+      {:ok, id} ->
+        {:ok, %{stream_id: id, direction: direction, envelope: envelope, recorded_at: now}}
 
       {:error, reason} ->
         {:error, reason}
