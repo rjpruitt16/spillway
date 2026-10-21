@@ -45,6 +45,7 @@ defmodule Spillway.JobOptionalWebhookStoreTest do
       })
 
     :ok = IdempotentStore.check_or_insert(job)
+    on_exit(fn -> IdempotentStore.delete_job(job) end)
     stored = IdempotentStore.get_job(job.id)
 
     assert stored.webhook_url == nil

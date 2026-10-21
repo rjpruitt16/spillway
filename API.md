@@ -236,7 +236,7 @@ Handshake errors match Aquifer: **400** for invalid protocol/session/upstream in
 GET /jobs/:id/stream
 ```
 
-Opens a server-sent event stream. Events: `queued`, `position`, `dispatching`, `completed`, `failed`. Keepalive pings sent every 30 seconds. If you disconnect before completion, the result is delivered to your `webhook_url`.
+Opens a server-sent event stream. Events: `queued`, `position`, `dispatching`, `completed`, `failed`. Keepalive pings sent every 30 seconds. If you disconnect before completion and the job has a `webhook_url`, the result is delivered there; either way it stays readable at `GET /jobs/:id`.
 
 ## Check job status
 

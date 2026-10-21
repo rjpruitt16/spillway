@@ -32,7 +32,8 @@ defmodule Spillway.FullnessTest do
         if value, do: System.put_env(key, value), else: System.delete_env(key)
       end
 
-      Enum.each(settings, &:ets.insert(:ez_queues, &1))
+      # insert_new: a queue that republished its setting meanwhile keeps its newer value.
+      Enum.each(settings, &:ets.insert_new(:ez_queues, &1))
     end)
 
     :ok
