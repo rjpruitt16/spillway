@@ -48,18 +48,21 @@ defmodule Spillway.WebSocketStore.Valkey do
 
   defp key(session_hash), do: @prefix <> session_hash
 
-  def append(session_hash, direction, envelope, config, session_id \\ nil) do
+  @frame_search_slack_ms 60_000
+
+  def append(session_hash, direction, envelope, config, session_id \\ nil, frame_id \\ nil) do
     now = System.system_time(:millisecond)
     key = key(session_hash)
 
-    fields = [
-      "direction",
-      direction,
-      "envelope",
-      Jason.encode!(envelope),
-      "recorded_at",
-      Integer.to_string(now)
-    ]
+    fields =
+      [
+        "direction",
+        direction,
+        "envelope",
+        Jason.encode!(envelope),
+        "recorded_at",
+        Integer.to_string(now)
+      ] ++ if(frame_id, do: ["frame_id", frame_id], else: [])
 
     result =
       case Spillway.WebSocketExport.enabled?() do
@@ -138,6 +141,37 @@ defmodule Spillway.WebSocketStore.Valkey do
     with :ok <- check_cursor(session_hash, cursor) do
       range(session_hash, "(" <> format(cursor), limit)
     end
+  end
+
+  @doc """
+  The entry written with frame_id since since_ms (this node's clock), or
+  nil. A session retrying a write whose reply timed out uses this to tell
+  whether the first attempt landed. Stream IDs carry Valkey's clock, so the
+  search starts a minute early to allow for skew; it reads every entry from
+  then, however many client commands were recorded meanwhile.
+  """
+  def find_frame(session_hash, frame_id, since_ms) do
+    start = Integer.to_string(max(since_ms - @frame_search_slack_ms, 0))
+
+    case Redix.command(conn(session_hash), ["XRANGE", key(session_hash), start, "+"]) do
+      {:ok, entries} ->
+        {:ok,
+         Enum.find_value(entries, fn [_id, fields] = entry ->
+           if frame_field(fields) == frame_id, do: decode(entry)
+         end)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp frame_field(fields) do
+    fields
+    |> Enum.chunk_every(2)
+    |> Enum.find_value(fn
+      ["frame_id", value] -> value
+      _ -> nil
+    end)
   end
 
   defp oldest(session_hash) do

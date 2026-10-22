@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 defmodule Spillway.WebSocketExportValkeyTest do
-  # Runs against a real Valkey when SPILLWAY_TEST_VALKEY_URL is set, e.g.
+  # Runs against a dedicated Valkey when SPILLWAY_TEST_VALKEY_URL is set;
+  # setup runs FLUSHDB (as websocket_session_valkey_test.exs does), so
+  # don't point it at a shared instance. For example:
   #   docker run -d -p 16380:6379 valkey/valkey:8
   #   SPILLWAY_TEST_VALKEY_URL=redis://localhost:16380 mix test
   use ExUnit.Case, async: false
