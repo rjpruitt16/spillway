@@ -247,7 +247,7 @@ One performance-2x node under Aquifer's soak harness for 112 hours: 500 jobs/s f
 |---|---|
 | Accepted | 185.3M |
 | Restarts (kills and 3 machine reboots) | 28 |
-| **Lost** | **0** at the final snapshot |
+| **Lost** | **0** at the final snapshot (234 jobs still in flight, the oldest 31 seconds old) |
 | Finished without a webhook | 262 (36,316 before #69) |
 | Duplicate webhooks | 9,956, all within 10 minutes of a restart |
 | WebSocket commands not completed within 5 minutes | 7,801 of 83.7M (0.009%) |
