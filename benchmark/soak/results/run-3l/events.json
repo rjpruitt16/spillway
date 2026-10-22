@@ -1,0 +1,3382 @@
+[
+  {
+    "at": "2026-10-20T13:33:49.261420199Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T13:43:49.270114064Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T13:53:49.285266109Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T14:00:00.085648541Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T14:01:00.087764835Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T14:03:49.299990021Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T14:03:49.305696634Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T14:13:49.320909853Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T14:13:49.320931012Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T14:23:49.335605236Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-20T14:30:00.086633404Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T14:31:00.08876127Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T14:33:49.349991938Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T14:33:49.349994239Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T14:43:49.365824022Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T15:00:00.086621104Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T15:01:00.088954766Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T15:23:49.419927469Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-20T15:30:00.086481627Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T15:31:00.088897238Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T15:33:49.43482355Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T15:43:49.450931028Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T15:43:49.456251396Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T15:53:49.465780237Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T15:53:49.471698165Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T15:56:02.742915505Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792511762737
+    }
+  },
+  {
+    "at": "2026-10-20T16:00:00.086727051Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T16:01:00.089040574Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T16:15:02.101321028Z",
+    "kind": "combined_peak_start",
+    "data": {
+      "rate": 2000,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T16:15:02.102306424Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T16:16:02.104314429Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T16:16:02.104977026Z",
+    "kind": "combined_peak_end"
+  },
+  {
+    "at": "2026-10-20T16:23:49.511494311Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-20T16:30:00.086665573Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T16:31:00.089020259Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T16:43:49.542231975Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T16:43:49.547539178Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T16:53:49.562359418Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T17:00:00.086892214Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T17:01:00.089303767Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T17:03:49.579992509Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T17:13:49.591584592Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T17:13:49.594967415Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T17:23:49.607417643Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T17:23:49.61021544Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T17:30:00.086857729Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T17:31:00.088776855Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T17:33:49.625020912Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T17:53:49.656090634Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-20T18:00:00.087337561Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T18:01:00.089298391Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T18:03:49.662906054Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T18:03:49.67141695Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T18:13:49.678817911Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T18:30:00.08698294Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T18:31:00.089201284Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T18:53:49.741193225Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T19:00:00.08646331Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T19:01:00.088382199Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T19:03:49.816796051Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T19:03:49.843189079Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T19:03:49.843259574Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 112,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-20T19:13:49.832324234Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T19:13:49.858274819Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T19:23:49.872776755Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-20T19:30:00.086658185Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T19:31:00.089932531Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T19:33:49.887833117Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T19:43:49.87680995Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T19:53:49.891738395Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-20T20:00:00.085869317Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T20:01:00.087903681Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T20:03:49.907587632Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T20:13:49.922332586Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T20:15:25.684786701Z",
+    "kind": "reboot",
+    "data": {
+      "at_unix_ms": 1792527325676
+    }
+  },
+  {
+    "at": "2026-10-20T20:30:00.085989392Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T20:31:00.087952745Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T21:00:00.085502909Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T21:01:00.087680256Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T21:03:49.996336777Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T21:13:50.011346188Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T21:23:50.051747829Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-20T21:30:00.085975564Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T21:31:00.087794848Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T21:43:50.081655631Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T21:53:50.070704469Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 290,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-20T22:00:00.085869023Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T22:01:00.087740219Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T22:03:50.085466985Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T22:30:00.086165359Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T22:31:00.088777831Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T22:53:50.161726609Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 272,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-20T23:00:00.086446527Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-20T23:01:00.088538047Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-20T23:03:50.176588243Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T23:03:50.198534568Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T23:13:50.19170925Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T23:13:50.213106199Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T23:23:50.206746919Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-20T23:23:50.230318059Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-20T23:30:00.085590866Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-20T23:31:00.087560506Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-20T23:33:50.222128178Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T23:33:50.244926587Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-20T23:53:50.252095227Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T00:00:00.085487612Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T00:01:00.087522904Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T00:03:50.266780514Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T00:04:26.393012135Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792541066384
+    }
+  },
+  {
+    "at": "2026-10-21T00:13:50.302538874Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 138,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T00:23:50.317885242Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T00:23:50.319332417Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T00:30:00.085533997Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T00:31:00.087674594Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T00:33:50.333895897Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T00:53:50.363816822Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T01:00:00.085824035Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T01:01:00.088074804Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T01:03:50.378799549Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T01:23:50.389305087Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T01:23:50.408462251Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 178,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T01:30:00.085522864Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T01:31:00.088135176Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T01:33:50.404132796Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T01:33:50.423346708Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T02:00:00.08549195Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T02:01:00.087850303Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T02:03:50.467907577Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T02:13:50.463546444Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T02:13:50.482530572Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T02:23:50.478490287Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T02:30:00.085348496Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T02:31:00.087903446Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T02:33:50.511688906Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T02:43:50.507848192Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 198,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T02:43:50.52660198Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T02:53:50.52263089Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T02:53:50.541267436Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T03:00:00.086035567Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T03:01:00.088456261Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T03:03:50.543205727Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T03:03:50.555895842Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T03:13:50.558619806Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T03:13:50.570949565Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T03:23:50.585885867Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T03:30:00.086293441Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T03:31:00.088075126Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T03:43:50.603997171Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T03:43:50.615061934Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T03:53:50.61888616Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T04:00:00.08639288Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T04:01:00.088117313Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T04:01:00.088326587Z",
+    "kind": "ramp_start",
+    "data": {
+      "steps": [
+        500,
+        750,
+        1000,
+        1250,
+        1500,
+        2000,
+        2500,
+        3000
+      ]
+    }
+  },
+  {
+    "at": "2026-10-21T04:05:00.096761093Z",
+    "kind": "ramp_end",
+    "data": {
+      "ceiling": 500,
+      "steps": [
+        {
+          "offered": 500,
+          "accepted_per_s": 502.5833333333333,
+          "shed_per_s": 2.216666666666667,
+          "completed_per_s": 654.9833333333333,
+          "sustained": true
+        },
+        {
+          "offered": 750,
+          "accepted_per_s": 708.65,
+          "shed_per_s": 40.46666666666667,
+          "completed_per_s": 546.55,
+          "sustained": false
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-21T04:13:50.658496083Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T04:23:50.673218713Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T04:30:00.086122397Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T04:31:00.088032113Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T04:43:05.711069739Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792557785706
+    }
+  },
+  {
+    "at": "2026-10-21T04:43:50.703443601Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T04:53:50.707597403Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T04:53:50.718835436Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T05:00:00.085995701Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T05:01:00.087634275Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T05:03:50.7224722Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T05:13:50.748081481Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T05:23:50.762977094Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T05:30:00.086239799Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T05:31:00.088145616Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T05:43:50.781375822Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T05:53:50.79615694Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T05:53:50.807420481Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T06:00:00.086132368Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T06:01:00.088574221Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T06:03:50.822900475Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T06:23:50.840884441Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 151,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T06:23:50.852225012Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 145,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T06:30:00.086446692Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T06:31:00.08861878Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T06:33:50.856293791Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T06:33:50.866948587Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T06:43:50.871166133Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 232,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T06:53:50.886083618Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T06:53:50.896860429Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T07:00:00.086237256Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T07:01:00.088288697Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T07:03:50.91161325Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T07:23:50.941544998Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T07:30:00.087242125Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T07:31:00.090170896Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T07:33:50.946056229Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T07:33:50.956808684Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T07:43:50.960974701Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T08:00:00.087193865Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T08:01:00.089262426Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T08:23:51.031433579Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T08:30:00.086377437Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T08:31:00.088755441Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T08:33:51.046206905Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T08:33:51.046240039Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T08:43:51.050574759Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T08:43:51.061430087Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T08:53:51.065361178Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T09:00:00.086943382Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T09:01:00.088926229Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T09:10:19.134907715Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792573819130
+    }
+  },
+  {
+    "at": "2026-10-21T09:30:00.08703388Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T09:31:00.089138038Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T09:43:51.13962665Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 216,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T09:53:51.154447019Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T10:00:00.086403924Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T10:01:00.088819418Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T10:13:51.199033016Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T10:23:51.214096564Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T10:30:00.088731213Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T10:31:00.090645619Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T10:33:51.214416035Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T10:33:51.229240417Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T10:43:51.230108974Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T10:43:51.243932496Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T10:53:51.244843912Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T10:53:51.259034932Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T11:00:00.086207021Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T11:01:00.088394192Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T11:03:51.26019224Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T11:23:51.303787766Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T11:30:00.086769833Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T11:31:00.088875798Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T11:33:51.318509604Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T11:43:51.334315721Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T11:53:51.349028748Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T12:00:00.086031027Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T12:01:00.088557847Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T12:23:51.394268373Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T12:30:00.086250257Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T12:31:00.088366239Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T12:33:51.409129025Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T12:43:51.407789478Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T12:43:51.424121193Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T12:53:51.423135917Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T13:00:00.086461193Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T13:01:00.08883015Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T13:13:51.456067917Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T13:23:51.471853899Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 283,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T13:23:51.486062403Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T13:30:00.087819038Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T13:31:00.089835473Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T13:33:51.487556563Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T13:33:51.501482836Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T13:43:51.51122564Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T13:53:51.532289972Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T13:58:36.34188793Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792591116334
+    }
+  },
+  {
+    "at": "2026-10-21T14:00:00.087437924Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T14:01:00.089599418Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T14:03:51.542350439Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T14:03:51.554496135Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T14:23:51.572290896Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T14:30:00.087370048Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T14:31:00.089899041Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T14:33:51.57712237Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T14:43:51.591913383Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T15:00:00.086829313Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T15:01:00.088840711Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T15:03:51.621835801Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T15:03:51.644153334Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T15:13:51.637154771Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T15:13:51.659012773Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T15:23:51.662708069Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T15:23:51.673816892Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T15:30:00.086756569Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T15:31:00.088785254Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T15:33:51.678004989Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T15:33:51.68880695Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T15:53:51.696942708Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 206,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T16:00:00.087115271Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T16:01:00.089656541Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T16:03:51.712153332Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T16:13:51.726866319Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T16:13:51.741040538Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T16:15:02.09717007Z",
+    "kind": "combined_peak_start",
+    "data": {
+      "rate": 2000,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T16:15:02.097935024Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T16:16:02.099539307Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T16:16:02.099849742Z",
+    "kind": "combined_peak_end"
+  },
+  {
+    "at": "2026-10-21T16:23:51.741786906Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T16:23:51.756305047Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T16:30:00.086637187Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T16:31:00.089578761Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T16:33:51.771896815Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T16:43:51.78659664Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T16:53:51.786205804Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T16:53:51.801613893Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T17:00:00.085866209Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T17:01:00.088200725Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T17:01:44.484761843Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792602104478
+    }
+  },
+  {
+    "at": "2026-10-21T17:03:51.801777487Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T17:23:51.845563761Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T17:30:00.086262881Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T17:31:00.089758617Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T17:33:51.860306942Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 97,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T17:33:51.866663441Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T17:43:51.861760006Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T17:43:51.875551053Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T17:43:51.881548889Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T17:53:51.876478891Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T18:00:00.086552192Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T18:01:00.08868055Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T18:13:51.925712812Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T18:23:51.920585465Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T18:23:51.940539296Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T18:30:00.086126719Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T18:31:00.087963239Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T18:33:51.935262107Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T18:33:51.955359863Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 71,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T18:43:51.964491339Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T18:43:51.970252824Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T18:53:51.980060841Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T19:00:00.086386877Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T19:01:00.088386353Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T19:13:52.016105989Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T19:23:52.010502409Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T19:23:52.030875325Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T19:30:00.086197828Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T19:31:00.0886797Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T19:33:52.025555228Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T19:43:52.060209599Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T19:53:52.074859485Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T20:00:00.086323975Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T20:01:00.088226737Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T20:03:52.089641277Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T20:30:00.085909896Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T20:31:00.089972726Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T20:33:52.128781156Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T20:37:25.167118511Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792615045159
+    }
+  },
+  {
+    "at": "2026-10-21T20:43:52.129718257Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-21T20:43:52.14389049Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T20:43:52.150682185Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T20:53:52.145111182Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T20:53:52.165331699Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-21T21:00:00.0864548Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T21:01:00.089033699Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T21:03:52.180014493Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T21:13:52.194827883Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 113,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T21:23:52.209837047Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 100,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T21:30:00.085881593Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T21:31:00.08791746Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T21:33:52.224784783Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T21:43:52.219192899Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T21:53:52.234253886Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T22:00:00.086241947Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T22:01:00.088709013Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T22:03:52.263168451Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-21T22:13:52.278057892Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T22:23:52.293775725Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T22:23:52.301205338Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T22:30:00.086649676Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T22:31:00.089257898Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-21T22:33:52.309151117Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 85,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-21T22:33:52.316087037Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T22:43:52.32426502Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T23:00:00.086863473Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-21T23:01:00.088561989Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-21T23:03:52.381596025Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-21T23:13:52.397007655Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-21T23:30:00.087259454Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-21T23:31:00.089139507Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T00:00:00.086326548Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T00:01:00.088288777Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T00:03:52.471891967Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T00:30:00.086756429Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T00:31:00.088713325Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T00:33:52.516275643Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T00:53:52.545795039Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T00:54:56.981011423Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792630496975
+    }
+  },
+  {
+    "at": "2026-10-22T01:00:00.087231909Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T01:01:00.090129049Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T01:03:52.560733535Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 95,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T01:03:52.560754387Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T01:13:52.575996759Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T01:13:52.576056925Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T01:13:52.576086227Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T01:23:52.590822898Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T01:30:00.086470423Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T01:31:00.088799647Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T01:33:52.605932041Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T01:43:52.620749697Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T01:43:52.620879767Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T01:53:52.635392163Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T01:53:52.635591967Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 208,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T02:00:00.086315176Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T02:01:00.088343328Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T02:03:52.650541458Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T02:23:52.680442773Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T02:30:00.086388294Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T02:31:00.088843471Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T02:33:52.695088559Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T02:43:52.709498705Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T02:53:52.724218673Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T03:00:00.086116059Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T03:01:00.088263826Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T03:30:00.085627489Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T03:31:00.087357457Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T03:33:52.788878242Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 62,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T03:43:52.803871066Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T03:53:52.812323374Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T04:00:00.085400434Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T04:01:00.088340101Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T04:01:00.088814409Z",
+    "kind": "ws_ramp_start",
+    "data": {
+      "steps_sessions": [
+        200,
+        400,
+        800,
+        1200,
+        1600,
+        2000,
+        2500
+      ]
+    }
+  },
+  {
+    "at": "2026-10-22T04:03:52.827068063Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:03:52.833066733Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T04:06:00.098697956Z",
+    "kind": "ws_ramp_end",
+    "data": {
+      "ceiling_sessions": 200,
+      "steps": [
+        {
+          "offered": 200,
+          "accepted_per_s": 195.43333333333334,
+          "shed_per_s": 0,
+          "completed_per_s": 342.4166666666667,
+          "sustained": true
+        },
+        {
+          "offered": 400,
+          "accepted_per_s": 400,
+          "shed_per_s": 0,
+          "completed_per_s": 331.1166666666667,
+          "sustained": false
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-22T04:12:52.889601919Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792642372883
+    }
+  },
+  {
+    "at": "2026-10-22T04:13:52.846756074Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T04:13:52.847658111Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:23:52.856899Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T04:23:52.861341952Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:23:52.863188797Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-22T04:30:00.085554749Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T04:31:00.087583016Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T04:33:52.872118825Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:33:52.876105236Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T04:33:52.879112099Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:43:52.887869411Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T04:43:52.890860648Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T04:53:52.90254052Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T04:53:52.905506576Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T05:00:00.08538731Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T05:01:00.087132472Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T05:03:52.91748609Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T05:13:52.93301027Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T05:23:52.949556569Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T05:30:00.085277595Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T05:31:00.08874549Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T05:33:52.964188687Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T05:33:52.966480447Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-22T05:43:52.981846477Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T06:00:00.085596268Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T06:01:00.087674875Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T06:13:53.021046355Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T06:23:53.035791828Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T06:23:53.041159094Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  },
+  {
+    "at": "2026-10-22T06:30:00.0858361Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T06:31:00.0880036Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T06:33:53.054488592Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T06:33:53.056615063Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T06:43:53.069259116Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T06:53:53.079571665Z",
+    "kind": "upstream_mode",
+    "data": {
+      "for_s": 227,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T06:53:53.083926855Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T06:53:53.086242345Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T07:00:00.086094815Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T07:01:00.088065149Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T07:03:53.094307322Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T07:13:53.109072763Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T07:23:53.124220908Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T07:23:53.130450268Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T07:30:00.085231825Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T07:31:00.088298924Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T07:43:53.159467818Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "for_s": 109,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T07:51:17.206631161Z",
+    "kind": "kill",
+    "data": {
+      "at_unix_ms": 1792655477200
+    }
+  },
+  {
+    "at": "2026-10-22T07:53:53.174298278Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T08:00:00.08441199Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T08:01:00.086548464Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T08:03:53.182538821Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T08:13:53.197040203Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T08:23:53.211452285Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T08:30:00.084264783Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T08:31:00.086240374Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T08:33:53.314764528Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T09:00:00.084179929Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T09:01:00.087335367Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T09:03:53.378268339Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T09:13:53.373563222Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T09:13:53.392780929Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T09:23:53.388075676Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T09:30:00.085168401Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T09:31:00.087025175Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T09:33:53.402840733Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T09:43:53.417630457Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T09:43:53.422931082Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T09:53:53.432077191Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T09:53:53.437987691Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T10:00:00.084435972Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T10:01:00.086321991Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T10:03:53.452947418Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T10:13:53.467664435Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "rate_limited_429"
+    }
+  },
+  {
+    "at": "2026-10-22T10:23:53.482699337Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T10:30:00.085543978Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T10:31:00.087446083Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T10:43:53.511756976Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T10:53:53.52647976Z",
+    "kind": "upstream_mode",
+    "data": {
+      "mode": "healthy"
+    }
+  },
+  {
+    "at": "2026-10-22T11:00:00.084536991Z",
+    "kind": "burst_start",
+    "data": {
+      "for_s": 60,
+      "rate": 2000
+    }
+  },
+  {
+    "at": "2026-10-22T11:01:00.086545755Z",
+    "kind": "burst_end"
+  },
+  {
+    "at": "2026-10-22T11:03:53.534749837Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T11:13:53.54944045Z",
+    "kind": "webhook_mode",
+    "data": {
+      "for_s": 87,
+      "mode": "down"
+    }
+  },
+  {
+    "at": "2026-10-22T11:16:32.009066183Z",
+    "kind": "reboot",
+    "data": {
+      "at_unix_ms": 1792667792003
+    }
+  },
+  {
+    "at": "2026-10-22T11:23:53.564150203Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T11:23:53.582285178Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "slow"
+    }
+  },
+  {
+    "at": "2026-10-22T11:30:00.085068656Z",
+    "kind": "ws_burst_start",
+    "data": {
+      "for_s": 60,
+      "sessions": 1000
+    }
+  },
+  {
+    "at": "2026-10-22T11:31:00.087367627Z",
+    "kind": "ws_burst_end"
+  },
+  {
+    "at": "2026-10-22T11:33:53.579534291Z",
+    "kind": "webhook_mode",
+    "data": {
+      "mode": "errors_503"
+    }
+  },
+  {
+    "at": "2026-10-22T11:33:53.597173141Z",
+    "kind": "ws_upstream_mode",
+    "data": {
+      "mode": "dropping"
+    }
+  }
+]

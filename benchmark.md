@@ -239,6 +239,23 @@ The last and largest fix came from timing each kind of message inside the queue 
 
 ---
 
+## 9. 112-hour soak (Fly.io, run 3l, 2026-10-17 to 2026-10-22)
+
+One performance-2x node under Aquifer's soak harness for 112 hours: 500 jobs/s from 50 users plus WebSocket sessions, hourly bursts, a daily ramp, a target API, webhook receiver and WebSocket backend that keep switching between healthy, slow, erroring and down, a `kill -9` every 3-5 hours and a full machine reboot every 36.
+
+| | |
+|---|---|
+| Accepted | 185.3M |
+| Restarts (kills and 3 machine reboots) | 28 |
+| **Lost** | **0** at the final snapshot (234 jobs still in flight, the oldest 31 seconds old) |
+| Finished without a webhook | 262 (36,316 before #69) |
+| Duplicate webhooks | 9,956, all within 10 minutes of a restart |
+| WebSocket commands not completed within 5 minutes | 7,801 of 83.7M (0.009%) |
+
+Memory and the store levelled off. Open file descriptors crept up from day to day but stayed flat within each process lifetime, so they're being watched rather than called a leak. Hourly accepts held a median of 460/s through the chaos. The largest jump in WebSocket commands not completed coincided with Valkey write timeouts; #78 now retries the write that a timeout used to drop. Jobs whose runner died mid-job waited, stranded, for the next restart to recover them (thousands between some restarts); #72 now requeues them. Full write-up and data: [benchmark/soak/results/run-3l](benchmark/soak/results/run-3l/README.md).
+
+---
+
 ## Reproducing these results
 
 ```bash
