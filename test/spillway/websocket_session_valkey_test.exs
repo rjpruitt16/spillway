@@ -168,7 +168,9 @@ defmodule Spillway.WebSocketSessionValkeyTest do
 
     frame = Jason.encode!(%{"type" => "event", "message_id" => "e1", "payload" => %{"n" => 1}})
     send(session, {:websocket_upstream_frame, self(), ref, frame})
-    Process.sleep(50)
+    # Send the command only once the first write has timed out and a retry
+    # is pending, so the test exercises the command hold.
+    wait_until(fn -> :sys.get_state(session, 15_000).pending_record == ref end, 10_000)
 
     command =
       Task.async(fn ->
