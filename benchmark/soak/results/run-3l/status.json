@@ -1,0 +1,634 @@
+{
+  "alerts": [
+    "7801 WebSocket commands recorded by the target but not completed within 5 minutes (58605 of their messages arrived later)"
+  ],
+  "cluster": null,
+  "config": {
+    "target": "http://spillway-soak.internal:4000",
+    "supervisor": "http://spillway-soak.internal:9090",
+    "self": "http://spillway-soak-driver.internal:8080",
+    "steady_rate": 500,
+    "burst_rate": 2000,
+    "ramp_hour_utc": 4,
+    "ramp_steps": [
+      500,
+      750,
+      1000,
+      1250,
+      1500,
+      2000,
+      2500,
+      3000
+    ],
+    "users": 50,
+    "chaos": true,
+    "combined_peak_hour_utc": 16,
+    "name": "Spillway",
+    "websocket": {
+      "enabled": true,
+      "steady_sessions": 200,
+      "burst_sessions": 1000,
+      "command_every_ms": 1000,
+      "events_per_command": 3,
+      "ramp_steps_sessions": [
+        200,
+        400,
+        800,
+        1200,
+        1600,
+        2000,
+        2500
+      ]
+    }
+  },
+  "daily": [
+    {
+      "date": "2026-10-17",
+      "hours": 5,
+      "rss_mb_first": 790.78515625,
+      "rss_mb_last": 851.796875,
+      "rss_mb_max": 1031.23828125,
+      "goroutines_last": 0,
+      "goroutines_max": 0,
+      "pebble_mb_first": 935.8863677978516,
+      "pebble_mb_last": 1112.2940864562988,
+      "e2e_p99_ms_median_of_hours": 30187.18,
+      "accept_p99_ms_median_of_hours": 105.16,
+      "accepted": 8341740,
+      "lost": 0,
+      "lost_within_flush_window": 0,
+      "duplicates": 6,
+      "finished_without_webhook": 14,
+      "ws_commands_completed": 3654835,
+      "ws_duplicate_events": 154726
+    },
+    {
+      "date": "2026-10-18",
+      "hours": 24,
+      "rss_mb_first": 973.14453125,
+      "rss_mb_last": 822.1640625,
+      "rss_mb_max": 1199.2421875,
+      "goroutines_last": 0,
+      "goroutines_max": 0,
+      "pebble_mb_first": 876.4997453689575,
+      "pebble_mb_last": 1336.5493392944336,
+      "e2e_p99_ms_median_of_hours": 38527.34,
+      "accept_p99_ms_median_of_hours": 127.83,
+      "accepted": 39606009,
+      "lost": 0,
+      "lost_within_flush_window": 0,
+      "duplicates": 1017,
+      "finished_without_webhook": 78,
+      "ramp_ceiling_per_s": 400,
+      "ramp_kind": "websocket_sessions",
+      "ramp_steps": [
+        {
+          "offered": 200,
+          "accepted_per_s": 200,
+          "shed_per_s": 0,
+          "completed_per_s": 294.23333333333335,
+          "sustained": true
+        },
+        {
+          "offered": 400,
+          "accepted_per_s": 400.01666666666665,
+          "shed_per_s": 0,
+          "completed_per_s": 397.46666666666664,
+          "sustained": true
+        },
+        {
+          "offered": 800,
+          "accepted_per_s": 674.0166666666667,
+          "shed_per_s": 0,
+          "completed_per_s": 292.4166666666667,
+          "sustained": false
+        }
+      ],
+      "ws_commands_completed": 18026502,
+      "ws_lost_commands": 97,
+      "ws_duplicate_events": 672790
+    },
+    {
+      "date": "2026-10-19",
+      "hours": 24,
+      "rss_mb_first": 838.73828125,
+      "rss_mb_last": 1011.62890625,
+      "rss_mb_max": 1098.4375,
+      "goroutines_last": 0,
+      "goroutines_max": 0,
+      "pebble_mb_first": 1323.5588865280151,
+      "pebble_mb_last": 1130.4451694488525,
+      "e2e_p99_ms_median_of_hours": 38527.34,
+      "accept_p99_ms_median_of_hours": 134.22,
+      "accepted": 39177077,
+      "lost": 0,
+      "lost_within_flush_window": 0,
+      "duplicates": 800,
+      "finished_without_webhook": 76,
+      "ramp_kind": "http_jobs_per_s",
+      "ramp_steps": [
+        {
+          "offered": 500,
+          "accepted_per_s": 481.68333333333334,
+          "shed_per_s": 24.8,
+          "completed_per_s": 631.4166666666666,
+          "sustained": false
+        }
+      ],
+      "ws_commands_completed": 17837294,
+      "ws_lost_commands": 5296,
+      "ws_duplicate_events": 1104598
+    },
+    {
+      "date": "2026-10-20",
+      "hours": 24,
+      "rss_mb_first": 588.953125,
+      "rss_mb_last": 1032.69921875,
+      "rss_mb_max": 1154.703125,
+      "goroutines_last": 0,
+      "goroutines_max": 0,
+      "pebble_mb_first": 1150.027500152588,
+      "pebble_mb_last": 1419.408727645874,
+      "e2e_p99_ms_median_of_hours": 33281.37,
+      "accept_p99_ms_median_of_hours": 147.98,
+      "accepted": 39315616,
+      "lost": 0,
+      "lost_within_flush_window": 0,
+      "duplicates": 2132,
+      "finished_without_webhook": 58,
+      "ramp_ceiling_per_s": 200,
+      "ramp_kind": "websocket_sessions",
+      "ramp_steps": [
+        {
+          "offered": 200,
+          "accepted_per_s": 196.16666666666666,
+          "shed_per_s": 0,
+          "completed_per_s": 337.3833333333333,
+          "sustained": true
+        },
+        {
+          "offered": 400,
+          "accepted_per_s": 389.6666666666667,
+          "shed_per_s": 0,
+          "completed_per_s": 196.15,
+          "sustained": false
+        }
+      ],
+      "ws_commands_completed": 17803825,
+      "ws_lost_commands": 19,
+      "ws_duplicate_events": 803060
+    },
+    {
+      "date": "2026-10-21",
+      "hours": 24,
+      "rss_mb_first": 811.30859375,
+      "rss_mb_last": 981.5625,
+      "rss_mb_max": 1192.84765625,
+      "goroutines_last": 0,
+      "goroutines_max": 0,
+      "pebble_mb_first": 1382.4989576339722,
+      "pebble_mb_last": 1362.8109617233276,
+      "e2e_p99_ms_median_of_hours": 38527.34,
+      "accept_p99_ms_median_of_hours": 163.14,
+      "accepted": 39609087,
+      "lost": 0,
+      "lost_within_flush_window": 0,
+      "duplicates": 5304,
+      "finished_without_webhook": 12,
+      "ramp_ceiling_per_s": 500,
+      "ramp_kind": "http_jobs_per_s",
+      "ramp_steps": [
+        {
+          "offered": 500,
+          "accepted_per_s": 502.5833333333333,
+          "shed_per_s": 2.216666666666667,
+          "completed_per_s": 654.9833333333333,
+          "sustained": true
+        },
+        {
+          "offered": 750,
+          "accepted_per_s": 708.65,
+          "shed_per_s": 40.46666666666667,
+          "completed_per_s": 546.55,
+          "sustained": false
+        }
+      ],
+      "ws_commands_completed": 17711434,
+      "ws_lost_commands": 680,
+      "ws_duplicate_events": 1040971
+    }
+  ],
+  "last_hour": {
+    "at": "2026-10-22T10:00:00Z",
+    "minutes": 60,
+    "accepted_per_s": 465.83194527841766,
+    "shed_per_s": 59.172224730092545,
+    "client_errors_per_s": 0,
+    "completed_per_s": 465.4119443965077,
+    "failed_per_s": 0.41999999968808444,
+    "accept_p50_ms": 7.92,
+    "accept_p99_ms": 140.93,
+    "e2e_p50_ms": 90.84,
+    "e2e_p99_ms": 38527.34,
+    "max_outstanding": 10006,
+    "max_queue_backlog": 10001,
+    "rss_mb_end": 881.0234375,
+    "rss_mb_max": 972.38671875,
+    "heap_inuse_mb_end": 0,
+    "goroutines_end": 0,
+    "goroutines_max": 0,
+    "open_fds_end": 1176,
+    "pebble_mb_end": 1102.7927618026733,
+    "pebble_files_end": 44,
+    "volume_free_pct_end": 64.26644428735703,
+    "target_restarts_total": 9,
+    "minutes_target_unreachable": 0,
+    "ledger_totals": {
+      "submitted": 211957500,
+      "accepted": 184150488,
+      "shed_429_503": 26452458,
+      "client_errors": 1353962,
+      "completed_webhooks": 184077268,
+      "failed_webhooks": 63747,
+      "duplicate_webhooks": 9940,
+      "duplicate_webhooks_within_10m_of_restart": 9940,
+      "finished_without_webhook": 256,
+      "late_webhooks_after_ledger_closed": 0,
+      "webhooks_for_requests_that_errored_client_side": 98,
+      "webhooks_for_unknown_jobs": 0,
+      "webhooks_in_driver_restart_gaps": 0,
+      "lost": 0,
+      "lost_within_flush_window_of_kill": 0,
+      "stuck_over_24h": 0
+    },
+    "upstream_down_s_total": 6837,
+    "webhook_down_s_total": 1417,
+    "websocket": {
+      "max_sessions_open": 1000,
+      "commands_sent_per_s": 210.98639267739568,
+      "commands_completed_per_s": 210.98638502566232,
+      "disconnects_per_s": 0.2222221679998204,
+      "command_p50_ms": 58.56,
+      "command_p99_ms": 54211.84,
+      "upstream_down_s_total": 3090,
+      "ledger_totals": {
+        "version": 3,
+        "handshakes": 105655,
+        "handshakes_rejected_by_status": {
+          "429": 3994,
+          "500": 913,
+          "503": 601
+        },
+        "handshake_errors": 91273,
+        "replay_gaps_409": 0,
+        "disconnects": 105455,
+        "server_draining": 0,
+        "commands_sent": 83222372,
+        "commands_resent": 3577062,
+        "commands_recorded": 83220159,
+        "commands_completed": 83206052,
+        "events_received": 249690444,
+        "duplicate_events": 4164254,
+        "duplicate_events_after_resend": 4164254,
+        "out_of_order_events": 0,
+        "messages_for_unknown_commands": 0,
+        "lost_commands": 7801,
+        "messages_after_expiry": 58605,
+        "unrecorded_commands": 1522
+      }
+    }
+  },
+  "last_minute": {
+    "at": "2026-10-22T11:42:52Z",
+    "phase": "steady",
+    "offered_per_s": 500,
+    "accepted_per_s": 500.2167351796855,
+    "shed_per_s": 0,
+    "client_errors_per_s": 0,
+    "completed_per_s": 501.63340204038826,
+    "failed_per_s": 0,
+    "duplicates_per_s": 0,
+    "accept_p50_ms": 10.62,
+    "accept_p99_ms": 100.16,
+    "e2e_p50_ms": 121.74,
+    "e2e_p99_ms": 3889.31,
+    "outstanding": 176,
+    "upstream_mode": "healthy",
+    "webhook_mode": "errors_503",
+    "target": {
+      "aquifer_pid": 671,
+      "aquifer_running": true,
+      "aquifer_up_s": 1575,
+      "data_bytes": 1215002964,
+      "data_files": 53,
+      "kills": 0,
+      "last_exit": "",
+      "open_fds": 1033,
+      "pebble_bytes": 1174718178,
+      "pebble_files": 48,
+      "restarts": 0,
+      "rss_bytes": 838070272,
+      "supervisor_up_s": 1575,
+      "threads": 23,
+      "volume_free_bytes": 6716944384,
+      "volume_total_bytes": 10447245312
+    },
+    "queue_backlog": 2,
+    "active_queues": 1,
+    "websocket": {
+      "phase": "steady",
+      "sessions_wanted": 200,
+      "sessions_open": 200,
+      "commands_sent_per_s": 200.0000273933371,
+      "commands_completed_per_s": 201.03336086820266,
+      "duplicate_events_per_s": 28.16667052456164,
+      "disconnects_per_s": 0,
+      "handshakes_failed_per_s": 0,
+      "command_p50_ms": 134.22,
+      "command_p99_ms": 1781.74,
+      "upstream_mode": "dropping"
+    }
+  },
+  "latest_report": {
+    "at": "2026-10-22T06:46:55.400136958Z",
+    "severity": "problem",
+    "summary": "WS lost commands +1,709 (6,092 -\u003e 7,801) in the 04:00Z ramp/kill/dropping-burst hour, none since 04:59; 0 lost jobs; fds median climbing 5 days",
+    "body": "Uptime: running about 107h since 19:03 UTC Oct 17. Kills since last report: 00:54:56 and 04:12:52 Oct 22 (24h total to 04:12 is 26 restarts caused, per ledger). Last full machine reboot 20:15 Oct 20; next due about 08:15 UTC Oct 22.\n\nLedger since last report (00:53 UTC):\n- HTTP: lost 0 (0 since start across 26 restarts), accepted 177.09M, lost_within_flush_window_of_kill 0, stuck_over_24h 0. Oldest outstanding job 101 s.\n- WebSocket lost_commands: 6,092 -\u003e 7,801 (+1,709, PROBLEM). All in the 04:00Z hour. Still 7,801 at 06:44, so no loss since 04:59.\n- messages_after_expiry 40,605 -\u003e 58,605 (+18,000). messages_for_unknown_commands 0, replay_gaps_409 0, unrecorded_commands 1,337 -\u003e 1,475 (kill and down-slot window, expected category).\n- duplicate_events_after_resend 3.78M -\u003e 4.12M. Webhooks: duplicates 9,259 -\u003e 9,917 (+501 in the 04:00 hour, within 10m of the 04:12 kill; proportionate to earlier kills).\n\n04:00-04:40 trace: WS ramp (800-session step, ceiling 200) overlapping the 04:00 HTTP burst; kill 04:12:52; WS upstream dropping at 04:23; 1,000-session burst at 04:30. WS command p50 rose to 234 s and p99 to 346 s by 04:35. HTTP e2e p99 reached about 50 s. HTTP accept p99 stayed under 200 ms.\n\nUnexplained / caveats:\n1. Logs hold only about 500 lines (from 06:30), so I cannot match command IDs to 04:00. The 18,000 late messages are larger than the 1,709 lost, so many \"lost\" commands may have completed after the 5-minute expiry. The counter still counts them as lost.\n2. Redix \"event store unavailable\" timeouts crash WebSocketSessionRegistry GenServers mid-call (06:00:06-06:00:07 burst, :infinity GenServer.call). The lost counter did not move at 06:00.\n3. Open soak-alert #66 describes 311 lost HTTP jobs that this ledger does not show. Still unresolved.\n\nTrends (daily medians of hourly values, Oct 17-22):\n- open_fds median 1018, 1031, 1090, 1144, 1202, 1256 (partial day). Daily max 1059, 1111, 1233, 1294, 1278, 1302. Up about 45-55 per day for five days under the same load pattern. Kills reset the process, so a per-process leak should reset too. This is a warning-level leak signal.\n- RSS daily max 1031, 1199, 1098, 1155, 1193, 1016 MB. Plateau.\n- Pebble end median 1098, 1178, 1290, 1257, 1285, 1272 MB; files max 50-59. Bounded.\n- Accept p99 median 105, 125, 134, 148, 159, 172 ms. Slow steady drift, still far below 1 s.\n- Heap and goroutines still read 0 (unmeasured), so the fd climb cannot be checked against them.\n- WS command p99 hourly 40-300 s with steady-minute p50 about 1.4 s. Still unexplained.\n- Ramp ceilings: WS 400 (Oct 18), 200 (Oct 20), 200 (Oct 22, 400 step not sustained). Two WS ceilings at 200 in a row, but both ramps ran with HTTP bursts and upstream degradation, so this is confounded. HTTP ceiling 500 (Oct 21).\n\nHarness: healthy. All 107 hourly summaries present. minutes_target_unreachable only in kill hours. No generator_saturated flag, no driver restart gaps.\n\nNext:\n1. Keep logs through the 04:00 Oct 24 WS ramp (odd day) and the 08:15 reboot. Match new lost command IDs to those windows.\n2. Add a per-command expiry record, or a late-completion count, so \"lost\" can be separated from \"completed after 5 minutes\".\n3. Export heap and goroutine metrics. Check whether open_fds falls back to baseline after kills.\n4. Rerun a clean WS ramp with no HTTP burst and no upstream mode change."
+  },
+  "ledger": {
+    "counters": {
+      "submitted": 213230335,
+      "accepted": 185310548,
+      "shed_429_503": 26519583,
+      "client_errors": 1400197,
+      "completed_webhooks": 185246408,
+      "failed_webhooks": 63747,
+      "duplicate_webhooks": 9956,
+      "duplicate_webhooks_within_10m_of_restart": 9956,
+      "finished_without_webhook": 262,
+      "late_webhooks_after_ledger_closed": 0,
+      "webhooks_for_requests_that_errored_client_side": 103,
+      "webhooks_for_unknown_jobs": 0,
+      "webhooks_in_driver_restart_gaps": 0,
+      "lost": 0,
+      "lost_within_flush_window_of_kill": 0,
+      "stuck_over_24h": 0
+    },
+    "outstanding": 234,
+    "oldest_outstanding_age_s": 31,
+    "target_restarts_caused": 28,
+    "run_started": "2026-10-17T19:03:43.03781651Z"
+  },
+  "more": {
+    "daily": "/status/daily",
+    "events": "/events?n=200",
+    "hourly": "/status/hourly?n=168",
+    "logs": "/logs?n=500\u0026grep=",
+    "minutes": "/status/minutes?n=180",
+    "reports": "/reports?n=20"
+  },
+  "now": "2026-10-22T11:43:04.57880704Z",
+  "offered_per_s": 500,
+  "paused": false,
+  "phase": "steady",
+  "recent_events": [
+    {
+      "at": "2026-10-22T09:13:53.373563222Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "errors_503"
+      }
+    },
+    {
+      "at": "2026-10-22T09:13:53.392780929Z",
+      "kind": "ws_upstream_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T09:23:53.388075676Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "rate_limited_429"
+      }
+    },
+    {
+      "at": "2026-10-22T09:30:00.085168401Z",
+      "kind": "ws_burst_start",
+      "data": {
+        "for_s": 60,
+        "sessions": 1000
+      }
+    },
+    {
+      "at": "2026-10-22T09:31:00.087025175Z",
+      "kind": "ws_burst_end"
+    },
+    {
+      "at": "2026-10-22T09:33:53.402840733Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T09:43:53.417630457Z",
+      "kind": "webhook_mode",
+      "data": {
+        "mode": "slow"
+      }
+    },
+    {
+      "at": "2026-10-22T09:43:53.422931082Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "slow"
+      }
+    },
+    {
+      "at": "2026-10-22T09:53:53.432077191Z",
+      "kind": "webhook_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T09:53:53.437987691Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T10:00:00.084435972Z",
+      "kind": "burst_start",
+      "data": {
+        "for_s": 60,
+        "rate": 2000
+      }
+    },
+    {
+      "at": "2026-10-22T10:01:00.086321991Z",
+      "kind": "burst_end"
+    },
+    {
+      "at": "2026-10-22T10:03:53.452947418Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "errors_503"
+      }
+    },
+    {
+      "at": "2026-10-22T10:13:53.467664435Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "rate_limited_429"
+      }
+    },
+    {
+      "at": "2026-10-22T10:23:53.482699337Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T10:30:00.085543978Z",
+      "kind": "ws_burst_start",
+      "data": {
+        "for_s": 60,
+        "sessions": 1000
+      }
+    },
+    {
+      "at": "2026-10-22T10:31:00.087446083Z",
+      "kind": "ws_burst_end"
+    },
+    {
+      "at": "2026-10-22T10:43:53.511756976Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "slow"
+      }
+    },
+    {
+      "at": "2026-10-22T10:53:53.52647976Z",
+      "kind": "upstream_mode",
+      "data": {
+        "mode": "healthy"
+      }
+    },
+    {
+      "at": "2026-10-22T11:00:00.084536991Z",
+      "kind": "burst_start",
+      "data": {
+        "for_s": 60,
+        "rate": 2000
+      }
+    },
+    {
+      "at": "2026-10-22T11:01:00.086545755Z",
+      "kind": "burst_end"
+    },
+    {
+      "at": "2026-10-22T11:03:53.534749837Z",
+      "kind": "webhook_mode",
+      "data": {
+        "mode": "errors_503"
+      }
+    },
+    {
+      "at": "2026-10-22T11:13:53.54944045Z",
+      "kind": "webhook_mode",
+      "data": {
+        "for_s": 87,
+        "mode": "down"
+      }
+    },
+    {
+      "at": "2026-10-22T11:16:32.009066183Z",
+      "kind": "reboot",
+      "data": {
+        "at_unix_ms": 1792667792003
+      }
+    },
+    {
+      "at": "2026-10-22T11:23:53.564150203Z",
+      "kind": "webhook_mode",
+      "data": {
+        "mode": "slow"
+      }
+    },
+    {
+      "at": "2026-10-22T11:23:53.582285178Z",
+      "kind": "ws_upstream_mode",
+      "data": {
+        "mode": "slow"
+      }
+    },
+    {
+      "at": "2026-10-22T11:30:00.085068656Z",
+      "kind": "ws_burst_start",
+      "data": {
+        "for_s": 60,
+        "sessions": 1000
+      }
+    },
+    {
+      "at": "2026-10-22T11:31:00.087367627Z",
+      "kind": "ws_burst_end"
+    },
+    {
+      "at": "2026-10-22T11:33:53.579534291Z",
+      "kind": "webhook_mode",
+      "data": {
+        "mode": "errors_503"
+      }
+    },
+    {
+      "at": "2026-10-22T11:33:53.597173141Z",
+      "kind": "ws_upstream_mode",
+      "data": {
+        "mode": "dropping"
+      }
+    }
+  ],
+  "run_started": "2026-10-17T19:03:43.03781651Z",
+  "running_for_h": 112,
+  "storm": null,
+  "upstream_mode": "healthy",
+  "webhook_mode": "errors_503",
+  "websocket": {
+    "backend_mode": "dropping",
+    "ledger": {
+      "version": 3,
+      "handshakes": 106655,
+      "handshakes_rejected_by_status": {
+        "429": 3994,
+        "500": 913,
+        "503": 601
+      },
+      "handshake_errors": 94455,
+      "replay_gaps_409": 0,
+      "disconnects": 106455,
+      "server_draining": 0,
+      "commands_sent": 83748510,
+      "commands_resent": 3581477,
+      "commands_recorded": 83746996,
+      "commands_completed": 83739167,
+      "events_received": 251289658,
+      "duplicate_events": 4179752,
+      "duplicate_events_after_resend": 4179752,
+      "out_of_order_events": 0,
+      "messages_for_unknown_commands": 0,
+      "lost_commands": 7801,
+      "messages_after_expiry": 58605,
+      "unrecorded_commands": 1522
+    },
+    "paused": false,
+    "phase": "steady",
+    "sessions_open": 200,
+    "sessions_wanted": 200
+  }
+}

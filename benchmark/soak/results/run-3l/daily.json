@@ -1,0 +1,177 @@
+[
+  {
+    "date": "2026-10-17",
+    "hours": 5,
+    "rss_mb_first": 790.78515625,
+    "rss_mb_last": 851.796875,
+    "rss_mb_max": 1031.23828125,
+    "goroutines_last": 0,
+    "goroutines_max": 0,
+    "pebble_mb_first": 935.8863677978516,
+    "pebble_mb_last": 1112.2940864562988,
+    "e2e_p99_ms_median_of_hours": 30187.18,
+    "accept_p99_ms_median_of_hours": 105.16,
+    "accepted": 8341740,
+    "lost": 0,
+    "lost_within_flush_window": 0,
+    "duplicates": 6,
+    "finished_without_webhook": 14,
+    "ws_commands_completed": 3654835,
+    "ws_duplicate_events": 154726
+  },
+  {
+    "date": "2026-10-18",
+    "hours": 24,
+    "rss_mb_first": 973.14453125,
+    "rss_mb_last": 822.1640625,
+    "rss_mb_max": 1199.2421875,
+    "goroutines_last": 0,
+    "goroutines_max": 0,
+    "pebble_mb_first": 876.4997453689575,
+    "pebble_mb_last": 1336.5493392944336,
+    "e2e_p99_ms_median_of_hours": 38527.34,
+    "accept_p99_ms_median_of_hours": 127.83,
+    "accepted": 39606009,
+    "lost": 0,
+    "lost_within_flush_window": 0,
+    "duplicates": 1017,
+    "finished_without_webhook": 78,
+    "ramp_ceiling_per_s": 400,
+    "ramp_kind": "websocket_sessions",
+    "ramp_steps": [
+      {
+        "offered": 200,
+        "accepted_per_s": 200,
+        "shed_per_s": 0,
+        "completed_per_s": 294.23333333333335,
+        "sustained": true
+      },
+      {
+        "offered": 400,
+        "accepted_per_s": 400.01666666666665,
+        "shed_per_s": 0,
+        "completed_per_s": 397.46666666666664,
+        "sustained": true
+      },
+      {
+        "offered": 800,
+        "accepted_per_s": 674.0166666666667,
+        "shed_per_s": 0,
+        "completed_per_s": 292.4166666666667,
+        "sustained": false
+      }
+    ],
+    "ws_commands_completed": 18026502,
+    "ws_lost_commands": 97,
+    "ws_duplicate_events": 672790
+  },
+  {
+    "date": "2026-10-19",
+    "hours": 24,
+    "rss_mb_first": 838.73828125,
+    "rss_mb_last": 1011.62890625,
+    "rss_mb_max": 1098.4375,
+    "goroutines_last": 0,
+    "goroutines_max": 0,
+    "pebble_mb_first": 1323.5588865280151,
+    "pebble_mb_last": 1130.4451694488525,
+    "e2e_p99_ms_median_of_hours": 38527.34,
+    "accept_p99_ms_median_of_hours": 134.22,
+    "accepted": 39177077,
+    "lost": 0,
+    "lost_within_flush_window": 0,
+    "duplicates": 800,
+    "finished_without_webhook": 76,
+    "ramp_kind": "http_jobs_per_s",
+    "ramp_steps": [
+      {
+        "offered": 500,
+        "accepted_per_s": 481.68333333333334,
+        "shed_per_s": 24.8,
+        "completed_per_s": 631.4166666666666,
+        "sustained": false
+      }
+    ],
+    "ws_commands_completed": 17837294,
+    "ws_lost_commands": 5296,
+    "ws_duplicate_events": 1104598
+  },
+  {
+    "date": "2026-10-20",
+    "hours": 24,
+    "rss_mb_first": 588.953125,
+    "rss_mb_last": 1032.69921875,
+    "rss_mb_max": 1154.703125,
+    "goroutines_last": 0,
+    "goroutines_max": 0,
+    "pebble_mb_first": 1150.027500152588,
+    "pebble_mb_last": 1419.408727645874,
+    "e2e_p99_ms_median_of_hours": 33281.37,
+    "accept_p99_ms_median_of_hours": 147.98,
+    "accepted": 39315616,
+    "lost": 0,
+    "lost_within_flush_window": 0,
+    "duplicates": 2132,
+    "finished_without_webhook": 58,
+    "ramp_ceiling_per_s": 200,
+    "ramp_kind": "websocket_sessions",
+    "ramp_steps": [
+      {
+        "offered": 200,
+        "accepted_per_s": 196.16666666666666,
+        "shed_per_s": 0,
+        "completed_per_s": 337.3833333333333,
+        "sustained": true
+      },
+      {
+        "offered": 400,
+        "accepted_per_s": 389.6666666666667,
+        "shed_per_s": 0,
+        "completed_per_s": 196.15,
+        "sustained": false
+      }
+    ],
+    "ws_commands_completed": 17803825,
+    "ws_lost_commands": 19,
+    "ws_duplicate_events": 803060
+  },
+  {
+    "date": "2026-10-21",
+    "hours": 24,
+    "rss_mb_first": 811.30859375,
+    "rss_mb_last": 981.5625,
+    "rss_mb_max": 1192.84765625,
+    "goroutines_last": 0,
+    "goroutines_max": 0,
+    "pebble_mb_first": 1382.4989576339722,
+    "pebble_mb_last": 1362.8109617233276,
+    "e2e_p99_ms_median_of_hours": 38527.34,
+    "accept_p99_ms_median_of_hours": 163.14,
+    "accepted": 39609087,
+    "lost": 0,
+    "lost_within_flush_window": 0,
+    "duplicates": 5304,
+    "finished_without_webhook": 12,
+    "ramp_ceiling_per_s": 500,
+    "ramp_kind": "http_jobs_per_s",
+    "ramp_steps": [
+      {
+        "offered": 500,
+        "accepted_per_s": 502.5833333333333,
+        "shed_per_s": 2.216666666666667,
+        "completed_per_s": 654.9833333333333,
+        "sustained": true
+      },
+      {
+        "offered": 750,
+        "accepted_per_s": 708.65,
+        "shed_per_s": 40.46666666666667,
+        "completed_per_s": 546.55,
+        "sustained": false
+      }
+    ],
+    "ws_commands_completed": 17711434,
+    "ws_lost_commands": 680,
+    "ws_duplicate_events": 1040971
+  }
+]
