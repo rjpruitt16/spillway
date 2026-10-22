@@ -72,8 +72,12 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     :sys.replace_state(session, &%{&1 | upstream_pid: test_pid})
     ref = make_ref()
 
-    # Freeze Valkey for 6 s, longer than Redix's 5 s timeout.
-    stall = Task.async(fn -> Redix.command(admin, ["DEBUG", "SLEEP", "6"], timeout: 10_000) end)
+    # Freeze Valkey for 12 s: the first write and the first retry both hit
+    # Redix's 5 s timeout, so a retry is still pending when the reconnect
+    # below is handled.
+    stall =
+      Task.async(fn -> Redix.command(admin, ["DEBUG", "SLEEP", "12"], timeout: 20_000) end)
+
     Process.sleep(100)
 
     frame = Jason.encode!(%{"type" => "event", "message_id" => "e1", "payload" => %{"n" => 1}})
@@ -90,7 +94,7 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     assert_receive {:websocket_upstream_frame_recorded, ^ref}, 20_000
     assert Process.alive?(session)
     assert :sys.get_state(session, 15_000).pending_record == nil
-    Task.await(stall, 10_000)
+    Task.await(stall, 20_000)
 
     assert {:ok, [%{envelope: %{"message_id" => "e1"}}]} =
              WebSocketStore.read_after(session_id, "0-0", 10)
@@ -130,6 +134,51 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     assert_receive {:websocket_upstream_frame_recorded, ^ref}, 20_000
     Task.await(stall, 10_000)
     Task.await(command, 10_000)
+
+    assert {:ok, entries} = WebSocketStore.read_after(session_id, "0-0", 10)
+    assert Enum.map(entries, & &1.envelope["message_id"]) == ["e1", "c1"]
+  end
+
+  # A client command sent while a backend message is being retried waits
+  # for it. Recorded first, it would move the client's cursor past the
+  # backend message, and the client would never be sent it.
+  test "a client still receives a backend message whose write timed out but landed",
+       %{admin: admin} do
+    session_id = "stall-client-#{System.unique_integer([:positive])}"
+    port = Enum.random(20_000..60_000)
+    start_supervised!({Bandit, plug: BackendPlug, port: port})
+
+    {:ok, session} =
+      WebSocketSession.start_link(
+        session_id: session_id,
+        upstream_url: "ws://127.0.0.1:#{port}/ws",
+        config: WebSocketConfig.load()
+      )
+
+    # This test process is the attached client and also stands in for the
+    # upstream (commands are sent to it as casts).
+    test_pid = self()
+    assert {:ok, _replay} = WebSocketSession.attach(session, test_pid, "0-0")
+    wait_until(fn -> :sys.get_state(session, 15_000).upstream_connected end, 10_000)
+    :sys.replace_state(session, &%{&1 | upstream_pid: test_pid})
+    ref = make_ref()
+
+    stall = Task.async(fn -> Redix.command(admin, ["DEBUG", "SLEEP", "6"], timeout: 10_000) end)
+    Process.sleep(100)
+
+    frame = Jason.encode!(%{"type" => "event", "message_id" => "e1", "payload" => %{"n" => 1}})
+    send(session, {:websocket_upstream_frame, self(), ref, frame})
+    Process.sleep(50)
+
+    command =
+      Task.async(fn ->
+        WebSocketSession.command(session, test_pid, %{"type" => "command", "message_id" => "c1"})
+      end)
+
+    assert_receive {:websocket_upstream_frame_recorded, ^ref}, 20_000
+    assert_receive {:websocket_event, %{"message_id" => "e1"}}, 5_000
+    Task.await(stall, 10_000)
+    assert {:ok, %{"type" => "command_recorded"}} = Task.await(command, 20_000)
 
     assert {:ok, entries} = WebSocketStore.read_after(session_id, "0-0", 10)
     assert Enum.map(entries, & &1.envelope["message_id"]) == ["e1", "c1"]

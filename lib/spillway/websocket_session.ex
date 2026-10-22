@@ -101,7 +101,7 @@ defmodule Spillway.WebSocketSession do
       not Map.has_key?(state.clients, client) ->
         {:reply, {:error, :client_not_attached}, state}
 
-      not :queue.is_empty(state.deferred) or
+      not :queue.is_empty(state.deferred) or state.pending_record != nil or
           commands_in_flight(state) >= state.config.backend_buffer ->
         {:noreply, %{state | deferred: :queue.in({from, client, message}, state.deferred)}}
 
@@ -132,6 +132,11 @@ defmodule Spillway.WebSocketSession do
   end
 
   defp commands_in_flight(state), do: :queue.len(state.pending_commands) + state.unwritten
+
+  # Commands also wait while a backend message is being retried: recording
+  # one would move live clients' cursors past that message, and they'd
+  # never be sent it.
+  defp release_deferred(%{pending_record: ref} = state) when ref != nil, do: state
 
   defp release_deferred(state) do
     with false <- commands_in_flight(state) >= state.config.backend_buffer,
@@ -651,14 +656,15 @@ defmodule Spillway.WebSocketSession do
   # the first failure.
   #
   # Order is kept: the upstream reads nothing more from the backend until
-  # this frame is acknowledged, and while a retry is pending the session
-  # doesn't connect a new upstream (pending_record), so a frame from a
-  # dropped connection can't land after one from its replacement.
+  # this frame is acknowledged, and while a retry is pending
+  # (pending_record) the session neither connects a new upstream nor
+  # records client commands, so nothing lands ahead of this frame.
   defp record_backend(state, pid, ref, frame, attempt) do
     case append_once(state.session_id, frame, attempt) do
       {:ok, event} ->
         send(pid, {:websocket_upstream_frame_recorded, ref})
-        {:noreply, deliver_event(%{state | pending_record: nil}, event)}
+        state = deliver_event(%{state | pending_record: nil}, event)
+        {:noreply, release_deferred(state)}
 
       {:error, reason} when attempt < @record_attempts ->
         delay = Jitter.add_ms(@record_backoff_ms * Integer.pow(2, attempt - 1))
