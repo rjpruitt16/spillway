@@ -23,7 +23,10 @@ defmodule Spillway.UserLoad do
     :ok
   end
 
-  def add(%Job{} = job), do: bump(job, 1)
+  def add(%Job{} = job) do
+    Spillway.Load.job_accepted()
+    bump(job, 1)
+  end
 
   def done(%Job{} = job), do: bump(job, -1)
 
@@ -45,6 +48,15 @@ defmodule Spillway.UserLoad do
       [{^user_id, _jobs, webhooks}] -> webhooks
       [] -> 0
     end
+  end
+
+  @doc "Users with jobs or webhook deliveries still owed on this node."
+  def active_users do
+    :ets.select_count(@table, [
+      {{:_, :"$2", :"$3"}, [{:orelse, {:>, :"$2", 0}, {:>, :"$3", 0}}], [true]}
+    ])
+  catch
+    :error, :badarg -> 0
   end
 
   @doc false

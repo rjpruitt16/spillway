@@ -97,6 +97,8 @@ defmodule Spillway.WebSocketSession do
   # handler waits in this call, Bandit reads no more of its frames, and TCP
   # slows the client down to the rate the backend accepts commands.
   def handle_call({:command, client, message}, from, state) do
+    Spillway.Load.ws_message()
+
     cond do
       not Map.has_key?(state.clients, client) ->
         {:reply, {:error, :client_not_attached}, state}
@@ -276,6 +278,7 @@ defmodule Spillway.WebSocketSession do
         {:noreply, state}
 
       {:ok, message} ->
+        Spillway.Load.ws_message()
         message = Map.put(message, "generation", state.generation)
         # Random, not a VM-local counter: a later session with the same
         # session_id writes to the same transcript.

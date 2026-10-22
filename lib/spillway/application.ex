@@ -74,6 +74,7 @@ defmodule Spillway.Application do
         l8_schema_children() ++
         [
           Spillway.Admission,
+          Spillway.Load,
           Spillway.IdempotentStore,
           Spillway.PoolRegistry,
           Spillway.RemoteBacklog,
