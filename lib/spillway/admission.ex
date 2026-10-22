@@ -398,7 +398,8 @@ defmodule Spillway.Admission do
     :ok
   end
 
-  defp measured_memory_mb, do: measured(4, 5, &current_memory_mb/0)
+  @doc false
+  def measured_memory_mb, do: measured(4, 5, &current_memory_mb/0)
   defp measured_db_bytes, do: measured(2, 3, fn -> db_bytes_reader().() end)
   defp sampled_store_backlog, do: sampled(6, 7, &Spillway.StorePressure.backlog/0)
 

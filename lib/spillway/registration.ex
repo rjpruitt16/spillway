@@ -149,6 +149,7 @@ defmodule Spillway.Registration do
     |> put_if(:pools, pools())
     |> put_if(:drain_state, drain_state && to_string(drain_state))
     |> Map.put(:fullness, safe_fullness())
+    |> Map.merge(Spillway.Load.current() || %{})
   end
 
   # Same number as the x-aqueduct-fullness response header, so a control
