@@ -84,7 +84,8 @@ defmodule Spillway.WebSocketStore do
   # With SPILLWAY_VALKEY_URL set, transcripts live in Valkey streams
   # (Spillway.WebSocketStore.Valkey) and the RocksDB code below is unused.
 
-  def append(session_id, direction, envelope) when direction in ["client", "backend"] do
+  def append(session_id, direction, envelope, frame_id \\ nil)
+      when direction in ["client", "backend"] do
     if Valkey.enabled?(),
       do:
         Valkey.append(
@@ -92,18 +93,22 @@ defmodule Spillway.WebSocketStore do
           direction,
           envelope,
           WebSocketConfig.load(),
-          session_id
+          session_id,
+          frame_id
         ),
       else: append_local(session_id, direction, envelope)
   end
 
   @doc """
-  The newest entry in a Valkey transcript, or nil. A Valkey write that
-  times out may still have landed, so a session retrying one checks here
-  first. Local writes are never ambiguous, so this is always nil locally.
+  The Valkey transcript entry appended with frame_id, or nil. A Valkey write
+  that times out may still have landed, so a session retrying one checks
+  here first. Local writes are never ambiguous, so this is always nil
+  locally.
   """
-  def last(session_id) do
-    if Valkey.enabled?(), do: Valkey.last(hash_session(session_id)), else: {:ok, nil}
+  def find_frame(session_id, frame_id) do
+    if Valkey.enabled?(),
+      do: Valkey.find_frame(hash_session(session_id), frame_id),
+      else: {:ok, nil}
   end
 
   defp append_local(session_id, direction, envelope) do

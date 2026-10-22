@@ -67,6 +67,7 @@ defmodule Spillway.WebSocketSession do
        deferred: :queue.new(),
        reconnect_attempt: 0,
        reconnect_timer: nil,
+       pending_record: nil,
        idle_timer: nil,
        generation: 0
      }}
@@ -208,6 +209,13 @@ defmodule Spillway.WebSocketSession do
     {:noreply, state}
   end
 
+  # A backend message from the last connection is still being retried;
+  # connect once it's recorded, so it stays ahead of the new connection's.
+  def handle_info(:connect_upstream, %{pending_record: ref} = state) when ref != nil do
+    Process.send_after(self(), :connect_upstream, 100)
+    {:noreply, state}
+  end
+
   def handle_info(:connect_upstream, state) do
     case WebSocketUpstream.start(
            state.upstream_url,
@@ -263,7 +271,9 @@ defmodule Spillway.WebSocketSession do
         {:noreply, state}
 
       {:ok, message} ->
-        record_backend(state, pid, ref, Map.put(message, "generation", state.generation), 1)
+        message = Map.put(message, "generation", state.generation)
+        frame_id = Integer.to_string(System.unique_integer([:positive]))
+        record_backend(state, pid, ref, {message, frame_id}, 1)
 
       {:error, reason} ->
         WebSocketUpstream.close(pid)
@@ -635,13 +645,17 @@ defmodule Spillway.WebSocketSession do
   # giving up. Giving up closes the session and loses the message: the
   # backend already sent it and won't send it again. A brief event store
   # stall (Redix timeouts during a load burst) used to do exactly that on
-  # the first failure. Retrying keeps order, because the upstream reads
-  # nothing more from the backend until this frame is acknowledged.
-  defp record_backend(state, pid, ref, message, attempt) do
-    case append_once(state.session_id, message, attempt) do
+  # the first failure.
+  #
+  # Order is kept: the upstream reads nothing more from the backend until
+  # this frame is acknowledged, and while a retry is pending the session
+  # doesn't connect a new upstream (pending_record), so a frame from a
+  # dropped connection can't land after one from its replacement.
+  defp record_backend(state, pid, ref, {message, frame_id} = frame, attempt) do
+    case append_once(state.session_id, message, frame_id, attempt) do
       {:ok, event} ->
         send(pid, {:websocket_upstream_frame_recorded, ref})
-        {:noreply, deliver_event(state, event)}
+        {:noreply, deliver_event(%{state | pending_record: nil}, event)}
 
       {:error, reason} when attempt < @record_attempts ->
         delay = Jitter.add_ms(@record_backoff_ms * Integer.pow(2, attempt - 1))
@@ -650,8 +664,8 @@ defmodule Spillway.WebSocketSession do
           "WebSocket session #{state.session_id}: recording a backend message failed (#{inspect(reason)}); retry #{attempt} of #{@record_attempts - 1} in #{delay} ms"
         )
 
-        Process.send_after(self(), {:record_backend, pid, ref, message, attempt + 1}, delay)
-        {:noreply, state}
+        Process.send_after(self(), {:record_backend, pid, ref, frame, attempt + 1}, delay)
+        {:noreply, %{state | pending_record: ref}}
 
       {:error, reason} ->
         stop_clients(state, 1011, "event store unavailable: #{inspect(reason)}")
@@ -659,15 +673,15 @@ defmodule Spillway.WebSocketSession do
   end
 
   # A write that timed out may have landed after all (Valkey ran it once it
-  # caught up). This session is its transcript's only writer, so if the
-  # newest entry is this message, the earlier attempt recorded it.
-  defp append_once(session_id, message, 1),
-    do: WebSocketStore.append(session_id, "backend", message)
+  # caught up), so a retry first looks for the frame by its id. Client
+  # commands can be recorded in between, so the newest entry isn't enough.
+  defp append_once(session_id, message, frame_id, 1),
+    do: WebSocketStore.append(session_id, "backend", message, frame_id)
 
-  defp append_once(session_id, message, _retry) do
-    case WebSocketStore.last(session_id) do
-      {:ok, %{direction: "backend", envelope: ^message} = event} -> {:ok, event}
-      {:ok, _other} -> WebSocketStore.append(session_id, "backend", message)
+  defp append_once(session_id, message, frame_id, _retry) do
+    case WebSocketStore.find_frame(session_id, frame_id) do
+      {:ok, nil} -> WebSocketStore.append(session_id, "backend", message, frame_id)
+      {:ok, event} -> {:ok, event}
       {:error, reason} -> {:error, reason}
     end
   end

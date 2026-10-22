@@ -48,18 +48,19 @@ defmodule Spillway.WebSocketStore.Valkey do
 
   defp key(session_hash), do: @prefix <> session_hash
 
-  def append(session_hash, direction, envelope, config, session_id \\ nil) do
+  def append(session_hash, direction, envelope, config, session_id \\ nil, frame_id \\ nil) do
     now = System.system_time(:millisecond)
     key = key(session_hash)
 
-    fields = [
-      "direction",
-      direction,
-      "envelope",
-      Jason.encode!(envelope),
-      "recorded_at",
-      Integer.to_string(now)
-    ]
+    fields =
+      [
+        "direction",
+        direction,
+        "envelope",
+        Jason.encode!(envelope),
+        "recorded_at",
+        Integer.to_string(now)
+      ] ++ if(frame_id, do: ["frame_id", frame_id], else: [])
 
     result =
       case Spillway.WebSocketExport.enabled?() do
@@ -140,20 +141,33 @@ defmodule Spillway.WebSocketStore.Valkey do
     end
   end
 
-  @doc "The newest entry in a transcript, or nil."
-  def last(session_hash) do
-    case Redix.command(conn(session_hash), [
-           "XREVRANGE",
-           key(session_hash),
-           "+",
-           "-",
-           "COUNT",
-           "1"
-         ]) do
-      {:ok, [entry]} -> {:ok, decode(entry)}
-      {:ok, []} -> {:ok, nil}
-      {:error, reason} -> {:error, reason}
+  @doc """
+  The entry written with frame_id among the transcript's newest `scan`
+  entries, or nil. A session retrying a write whose reply timed out uses
+  this to tell whether the first attempt landed.
+  """
+  def find_frame(session_hash, frame_id, scan \\ 200) do
+    command = ["XREVRANGE", key(session_hash), "+", "-", "COUNT", Integer.to_string(scan)]
+
+    case Redix.command(conn(session_hash), command) do
+      {:ok, entries} ->
+        {:ok,
+         Enum.find_value(entries, fn [_id, fields] = entry ->
+           if frame_field(fields) == frame_id, do: decode(entry)
+         end)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
+  end
+
+  defp frame_field(fields) do
+    fields
+    |> Enum.chunk_every(2)
+    |> Enum.find_value(fn
+      ["frame_id", value] -> value
+      _ -> nil
+    end)
   end
 
   defp oldest(session_hash) do
