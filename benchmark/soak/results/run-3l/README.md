@@ -60,8 +60,7 @@ Run 3j, before #69, had 36,316 jobs finished without a webhook.
     first day's level. One-minute peaks of 2,600-3,550 came during bursts
     and webhook outages and fell back the next minute.
 - **Restarts recover.** After each kill or reboot the backlog drained and
-  accepts returned to 500/s within minutes. The oldest outstanding job was
-  0-30 seconds old at most checks.
+  accepts returned to 500/s within minutes.
 - **Throughput.** Hourly accepts: median 460/s, lowest 374/s, in an
   outage-heavy hour. Accept p99 median 148ms. The HTTP ramp sustained
   500/s (Oct 21).
@@ -100,6 +99,21 @@ Separately, 58,605 WebSocket messages arrived after their command's
 The Oct 22 ramp window isn't fully explained: Spillway's logger was dropping
 lines at the time, and no Valkey errors appear for those minutes. #70 tracks
 it.
+
+### Jobs stranded until the next restart
+
+A job runner that died mid-job (for example during a burst) left its job
+marked in flight in the store but no longer in the queue, and kept its
+concurrency slot, so nothing ran the job until the next kill or reboot
+recovered it. Between restarts the stranded jobs piled up: after the
+Oct 18 combined peak about 1,200-1,900 jobs sat unfinished until the 18:34
+kill recovered 2,053 of them, and at other checks the oldest outstanding
+job was 112-165 minutes old. After these files were fetched, between the
+14:35 kill and 17:43 on Oct 22, the stranded set grew to about 5,500 jobs
+(the oldest 163 minutes) in steps at the hourly bursts. None were lost, since
+a restart recovers them, but each recovery adds duplicate webhooks. #72
+(merged after this run's build) monitors job runners so a dead one frees
+its slot and requeues its job.
 
 ### Ramp ceilings
 
