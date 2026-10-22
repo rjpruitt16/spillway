@@ -48,6 +48,8 @@ defmodule Spillway.WebSocketStore.Valkey do
 
   defp key(session_hash), do: @prefix <> session_hash
 
+  @frame_search_slack_ms 60_000
+
   def append(session_hash, direction, envelope, config, session_id \\ nil, frame_id \\ nil) do
     now = System.system_time(:millisecond)
     key = key(session_hash)
@@ -142,14 +144,16 @@ defmodule Spillway.WebSocketStore.Valkey do
   end
 
   @doc """
-  The entry written with frame_id among the transcript's newest `scan`
-  entries, or nil. A session retrying a write whose reply timed out uses
-  this to tell whether the first attempt landed.
+  The entry written with frame_id since since_ms (this node's clock), or
+  nil. A session retrying a write whose reply timed out uses this to tell
+  whether the first attempt landed. Stream IDs carry Valkey's clock, so the
+  search starts a minute early to allow for skew; it reads every entry from
+  then, however many client commands were recorded meanwhile.
   """
-  def find_frame(session_hash, frame_id, scan \\ 200) do
-    command = ["XREVRANGE", key(session_hash), "+", "-", "COUNT", Integer.to_string(scan)]
+  def find_frame(session_hash, frame_id, since_ms) do
+    start = Integer.to_string(max(since_ms - @frame_search_slack_ms, 0))
 
-    case Redix.command(conn(session_hash), command) do
+    case Redix.command(conn(session_hash), ["XRANGE", key(session_hash), start, "+"]) do
       {:ok, entries} ->
         {:ok,
          Enum.find_value(entries, fn [_id, fields] = entry ->

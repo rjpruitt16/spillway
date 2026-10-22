@@ -19,6 +19,27 @@ defmodule Spillway.WebSocketSessionValkeyTest do
                  else: "set SPILLWAY_TEST_VALKEY_URL to run against a real Valkey"
                )
 
+  defmodule QuietBackend do
+    @behaviour WebSock
+    @impl true
+    def init(state), do: {:ok, state}
+    @impl true
+    def handle_in(_frame, state), do: {:ok, state}
+    @impl true
+    def handle_info(_message, state), do: {:ok, state}
+  end
+
+  defmodule BackendPlug do
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      conn
+      |> Plug.Conn.put_resp_header("sec-websocket-protocol", "aqueduct.v1")
+      |> WebSockAdapter.upgrade(QuietBackend, %{}, timeout: :infinity)
+      |> Plug.Conn.halt()
+    end
+  end
+
   setup do
     System.put_env("SPILLWAY_VALKEY_URL", @url)
     {:ok, admin} = Redix.start_link(@url)
@@ -33,11 +54,15 @@ defmodule Spillway.WebSocketSessionValkeyTest do
   test "a backend message is still recorded after the event store stalls past the Redix timeout",
        %{admin: admin} do
     session_id = "stall-#{System.unique_integer([:positive])}"
+    # A reachable backend, so a reconnect that isn't held back would
+    # actually replace the upstream.
+    port = Enum.random(20_000..60_000)
+    start_supervised!({Bandit, plug: BackendPlug, port: port})
 
     {:ok, session} =
       WebSocketSession.start_link(
         session_id: session_id,
-        upstream_url: "ws://127.0.0.1:1/ws",
+        upstream_url: "ws://127.0.0.1:#{port}/ws",
         config: WebSocketConfig.load()
       )
 
@@ -54,8 +79,17 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     frame = Jason.encode!(%{"type" => "event", "message_id" => "e1", "payload" => %{"n" => 1}})
     send(session, {:websocket_upstream_frame, self(), ref, frame})
 
+    # Once the first write has timed out and a retry is pending, a
+    # reconnect must wait: a new upstream's frames would otherwise be
+    # recorded ahead of this one.
+    wait_until(fn -> :sys.get_state(session, 15_000).pending_record == ref end, 10_000)
+    send(session, :connect_upstream)
+    Process.sleep(300)
+    assert :sys.get_state(session, 15_000).upstream_pid == test_pid
+
     assert_receive {:websocket_upstream_frame_recorded, ^ref}, 20_000
     assert Process.alive?(session)
+    assert :sys.get_state(session, 15_000).pending_record == nil
     Task.await(stall, 10_000)
 
     assert {:ok, [%{envelope: %{"message_id" => "e1"}}]} =
@@ -99,5 +133,13 @@ defmodule Spillway.WebSocketSessionValkeyTest do
 
     assert {:ok, entries} = WebSocketStore.read_after(session_id, "0-0", 10)
     assert Enum.map(entries, & &1.envelope["message_id"]) == ["e1", "c1"]
+  end
+
+  defp wait_until(fun, timeout_ms) do
+    cond do
+      fun.() -> :ok
+      timeout_ms <= 0 -> flunk("condition not met")
+      true -> Process.sleep(20) && wait_until(fun, timeout_ms - 20)
+    end
   end
 end

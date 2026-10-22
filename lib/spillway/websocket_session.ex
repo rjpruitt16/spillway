@@ -272,8 +272,11 @@ defmodule Spillway.WebSocketSession do
 
       {:ok, message} ->
         message = Map.put(message, "generation", state.generation)
-        frame_id = Integer.to_string(System.unique_integer([:positive]))
-        record_backend(state, pid, ref, {message, frame_id}, 1)
+        # Random, not a VM-local counter: a later session with the same
+        # session_id writes to the same transcript.
+        frame_id = Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
+        started_ms = System.system_time(:millisecond)
+        record_backend(state, pid, ref, {message, frame_id, started_ms}, 1)
 
       {:error, reason} ->
         WebSocketUpstream.close(pid)
@@ -651,8 +654,8 @@ defmodule Spillway.WebSocketSession do
   # this frame is acknowledged, and while a retry is pending the session
   # doesn't connect a new upstream (pending_record), so a frame from a
   # dropped connection can't land after one from its replacement.
-  defp record_backend(state, pid, ref, {message, frame_id} = frame, attempt) do
-    case append_once(state.session_id, message, frame_id, attempt) do
+  defp record_backend(state, pid, ref, frame, attempt) do
+    case append_once(state.session_id, frame, attempt) do
       {:ok, event} ->
         send(pid, {:websocket_upstream_frame_recorded, ref})
         {:noreply, deliver_event(%{state | pending_record: nil}, event)}
@@ -673,13 +676,14 @@ defmodule Spillway.WebSocketSession do
   end
 
   # A write that timed out may have landed after all (Valkey ran it once it
-  # caught up), so a retry first looks for the frame by its id. Client
-  # commands can be recorded in between, so the newest entry isn't enough.
-  defp append_once(session_id, message, frame_id, 1),
+  # caught up), so a retry first looks for the frame by its id among the
+  # entries written since the first attempt. Client commands can be
+  # recorded in between, so the newest entry isn't enough.
+  defp append_once(session_id, {message, frame_id, _started_ms}, 1),
     do: WebSocketStore.append(session_id, "backend", message, frame_id)
 
-  defp append_once(session_id, message, frame_id, _retry) do
-    case WebSocketStore.find_frame(session_id, frame_id) do
+  defp append_once(session_id, {message, frame_id, started_ms}, _retry) do
+    case WebSocketStore.find_frame(session_id, frame_id, started_ms) do
       {:ok, nil} -> WebSocketStore.append(session_id, "backend", message, frame_id)
       {:ok, event} -> {:ok, event}
       {:error, reason} -> {:error, reason}

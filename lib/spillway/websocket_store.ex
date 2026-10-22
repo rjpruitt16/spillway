@@ -105,9 +105,9 @@ defmodule Spillway.WebSocketStore do
   here first. Local writes are never ambiguous, so this is always nil
   locally.
   """
-  def find_frame(session_id, frame_id) do
+  def find_frame(session_id, frame_id, since_ms) do
     if Valkey.enabled?(),
-      do: Valkey.find_frame(hash_session(session_id), frame_id),
+      do: Valkey.find_frame(hash_session(session_id), frame_id, since_ms),
       else: {:ok, nil}
   end
 
