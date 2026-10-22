@@ -74,7 +74,6 @@ defmodule Spillway.Application do
         l8_schema_children() ++
         [
           Spillway.Admission,
-          Spillway.Load,
           Spillway.IdempotentStore,
           Spillway.PoolRegistry,
           Spillway.RemoteBacklog,
@@ -125,7 +124,9 @@ defmodule Spillway.Application do
   # already follows.
   defp registration_children do
     if Spillway.Registration.enabled?() do
-      [Spillway.Registration]
+      # Load readings are only for the control plane registration reports
+      # to, so they start and stop with it.
+      [Spillway.Load, Spillway.Registration]
     else
       []
     end

@@ -14,7 +14,8 @@ defmodule Spillway.Load do
   5 seconds this node reads how busy its schedulers were, how many
   jobs it accepted and how many WebSocket messages it moved. It splits the
   CPU in use between the two kinds by what each costs (from benchmark.md:
-  about 700 jobs/s and 900 WebSocket messages/s per CPU), and works out
+  about 700 jobs/s and 900 WebSocket round trips/s per CPU, which is
+  1,800 messages: a client message and a backend one), and works out
   what one more user or session costs from that:
 
       headroom      = 80% - CPU in use
@@ -40,7 +41,9 @@ defmodule Spillway.Load do
   # Measured per CPU: benchmark.md section 8 (jobs end to end, webhook
   # included) and Aquifer's benchmark.md section 13 (WebSocket round trips).
   @jobs_per_cpu 700
-  @ws_messages_per_cpu 900
+  # A round trip is two messages, a client one and a backend one, and
+  # ws_message/0 counts each.
+  @ws_messages_per_cpu 1_800
   @session_memory_kb 50
 
   # Assumed while there's no traffic to measure.
@@ -142,7 +145,9 @@ defmodule Spillway.Load do
     # Scheduler busy time is only kept while this flag is on, and only for
     # as long as the process that turned it on lives.
     :erlang.system_flag(:scheduler_wall_time, true)
-    send(self(), :sample)
+    # The first reading waits a second, so it averages over a real window
+    # rather than the microseconds since init.
+    Process.send_after(self(), :sample, 1_000)
 
     {:ok,
      %{result: result, scheduler: :scheduler.sample(), counts: counts(), at: now(), averages: nil}}

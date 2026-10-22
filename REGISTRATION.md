@@ -54,9 +54,9 @@ reports that it exists and is reachable.
 
 ### Load: HTTP users and WebSocket sessions
 
-`http_users` is how many users have jobs or webhook deliveries still owed on this node, and `ws_sessions` how many WebSocket clients are connected. `http_capacity` and `ws_capacity` are how many of each it can hold. A control plane like Canalis gives the node no more HTTP users or sessions than that, counting each kind on its own, so open sessions never use up the room HTTP users need. Every response carries the same four numbers as `X-Aqueduct-Http-Users`, `X-Aqueduct-Http-Capacity`, `X-Aqueduct-WS-Sessions` and `X-Aqueduct-WS-Capacity`. They're left out until the first reading, a few seconds after start.
+`http_users` is how many users have jobs or webhook deliveries still owed on this node, and `ws_sessions` how many WebSocket clients are connected. `http_capacity` and `ws_capacity` are how many of each it can hold. A control plane like Canalis gives the node no more HTTP users or sessions than that, counting each kind on its own, so open sessions never use up the room HTTP users need. Every response carries the same four numbers as `X-Aqueduct-Http-Users`, `X-Aqueduct-Http-Capacity`, `X-Aqueduct-WS-Sessions` and `X-Aqueduct-WS-Capacity`. The readings run only while registration is on, and the headers are left out until the first one, a second after start.
 
-Both kinds of traffic spend the same CPU, so the capacities come from one budget: what one kind isn't using, the other can have. Every 5 seconds, `Spillway.Load` reads how busy the BEAM's schedulers were, and how many jobs and WebSocket messages the node handled. Readings are averaged over about 30 seconds. The CPU in use is split between the two kinds by what each costs, measured in [benchmark.md](benchmark.md): about 700 jobs/s and 900 WebSocket messages/s per CPU. That gives the CPU one user or one session costs, and:
+Both kinds of traffic spend the same CPU, so the capacities come from one budget: what one kind isn't using, the other can have. Every 5 seconds, `Spillway.Load` reads how busy the BEAM's schedulers were, and how many jobs and WebSocket messages the node handled. Readings are averaged over about 30 seconds. The CPU in use is split between the two kinds by what each costs, measured in [benchmark.md](benchmark.md): about 700 jobs/s and 900 WebSocket round trips/s per CPU, which is 1,800 messages, since each round trip is a client message and a backend one. That gives the CPU one user or one session costs, and:
 
 ```
 headroom      = 80% of CPU - CPU in use
@@ -66,7 +66,7 @@ ws_capacity   = the least of  ws_sessions + headroom / CPU per session
                               SPILLWAY_WS_MAX_CLIENT_CONNECTIONS
 ```
 
-Neither number is ever below what the node already has. With nothing to measure yet, a user is taken to send 10 jobs/s and a session 1 message/s: an idle 1-CPU node reports 56 users and 720 sessions, an idle 2-CPU node 112 users and 1,000 sessions. Aquifer reports the same four numbers the same way, with its own costs.
+Neither number is ever below what the node already has. With nothing to measure yet, a user is taken to send 10 jobs/s and a session 1 message/s: an idle 1-CPU node reports 56 users and 1,000 sessions (the session cap), an idle 2-CPU node 112 users and 1,000 sessions. Aquifer reports the same four numbers the same way, with its own costs.
 
 `reserved_for`, `role` and `pools` are only present when their env vars are set. `drain_state` is only present when drain mode is enabled ([DRAIN_MODE.md](DRAIN_MODE.md)): it's drain mode's own `active` / `draining` / `unassigned`, kept separate from `state` because drain mode's "draining" means "finishing one tenant's burst", not "shutting down". Reaching `unassigned` sends a ping right away instead of waiting for the next heartbeat, since that's the control plane's cue to hand this instance to someone else.
 

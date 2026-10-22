@@ -26,12 +26,12 @@ defmodule Spillway.LoadTest do
   }
 
   test "an idle node assumes 10 jobs/s per user and 1 message/s per session" do
-    # 80% of one CPU / (10 / 700) = 56 users; / (1 / 900) = 720 sessions.
+    # 80% of one CPU / (10 / 700) = 56 users; / (1 / 1,800) = 1,440 sessions, capped at 1,000.
     assert Load.compute(@idle) == %{
              http_users: 0,
              http_capacity: 56,
              ws_sessions: 0,
-             ws_capacity: 720
+             ws_capacity: 1_000
            }
   end
 
@@ -90,6 +90,8 @@ defmodule Spillway.LoadTest do
   end
 
   test "goes in the registration ping and on every response once read" do
+    # Started with registration, which is off in tests.
+    start_supervised!(Load)
     wait_for_reading()
 
     payload = Registration.payload()

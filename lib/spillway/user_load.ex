@@ -28,7 +28,13 @@ defmodule Spillway.UserLoad do
     bump(job, 1)
   end
 
-  def done(%Job{} = job), do: bump(job, -1)
+  def done(%Job{user_id: user_id} = job) do
+    bump(job, -1)
+    # Drop the row once nothing is owed, so the table holds active users,
+    # not every user the node has seen. A bump that lands first keeps it.
+    :ets.select_delete(@table, [{{user_id, 0, 0}, [], [true]}])
+    :ok
+  end
 
   @doc "Returns :ok or {:rejected, limit, backlog}."
   def webhook_backlog_decision(user_id, draw \\ :rand.uniform()) do
