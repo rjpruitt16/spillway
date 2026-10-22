@@ -252,7 +252,7 @@ One performance-2x node under Aquifer's soak harness for 112 hours: 500 jobs/s f
 | Duplicate webhooks | 9,956, all within 10 minutes of a restart |
 | WebSocket commands not completed within 5 minutes | 7,801 of 83.7M (0.009%) |
 
-Memory and the store levelled off. Open file descriptors crept up from day to day but stayed flat within each process lifetime, so they're being watched rather than called a leak. Hourly accepts held a median of 460/s through the chaos. The largest jump in WebSocket commands not completed coincided with Valkey write timeouts; #78 now retries the write that a timeout used to drop. Full write-up and data: [benchmark/soak/results/run-3l](benchmark/soak/results/run-3l/README.md).
+Memory and the store levelled off. Open file descriptors crept up from day to day but stayed flat within each process lifetime, so they're being watched rather than called a leak. Hourly accepts held a median of 460/s through the chaos. The largest jump in WebSocket commands not completed coincided with Valkey write timeouts; #78 now retries the write that a timeout used to drop. Jobs whose runner died mid-job waited, stranded, for the next restart to recover them (thousands between some restarts); #72 now requeues them. Full write-up and data: [benchmark/soak/results/run-3l](benchmark/soak/results/run-3l/README.md).
 
 ---
 
