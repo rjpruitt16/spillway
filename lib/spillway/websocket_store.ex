@@ -97,6 +97,15 @@ defmodule Spillway.WebSocketStore do
       else: append_local(session_id, direction, envelope)
   end
 
+  @doc """
+  The newest entry in a Valkey transcript, or nil. A Valkey write that
+  times out may still have landed, so a session retrying one checks here
+  first. Local writes are never ambiguous, so this is always nil locally.
+  """
+  def last(session_id) do
+    if Valkey.enabled?(), do: Valkey.last(hash_session(session_id)), else: {:ok, nil}
+  end
+
   defp append_local(session_id, direction, envelope) do
     config = WebSocketConfig.load()
     session_hash = hash_session(session_id)

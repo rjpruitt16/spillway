@@ -24,6 +24,11 @@ defmodule Spillway.WebSocketSession do
 
   @registry Spillway.WebSocketSessionRegistry
 
+  # A backend message that can't be recorded is retried after 200, 400,
+  # 800 and 1,600 ms (plus jitter) before the session gives up.
+  @record_attempts 5
+  @record_backoff_ms 200
+
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
     GenServer.start_link(__MODULE__, opts, name: {:via, Registry, {@registry, session_id}})
@@ -258,22 +263,16 @@ defmodule Spillway.WebSocketSession do
         {:noreply, state}
 
       {:ok, message} ->
-        message = Map.put(message, "generation", state.generation)
-
-        case WebSocketStore.append(state.session_id, "backend", message) do
-          {:ok, event} ->
-            send(pid, {:websocket_upstream_frame_recorded, ref})
-            {:noreply, deliver_event(state, event)}
-
-          {:error, reason} ->
-            stop_clients(state, 1011, "event store unavailable: #{inspect(reason)}")
-        end
+        record_backend(state, pid, ref, Map.put(message, "generation", state.generation), 1)
 
       {:error, reason} ->
         WebSocketUpstream.close(pid)
         {:noreply, notify_error(state, reason)}
     end
   end
+
+  def handle_info({:record_backend, pid, ref, message, attempt}, state),
+    do: record_backend(state, pid, ref, message, attempt)
 
   def handle_info({:websocket_upstream_frame, pid, ref, _raw}, state) do
     send(pid, {:websocket_upstream_frame_recorded, ref})
@@ -630,6 +629,47 @@ defmodule Spillway.WebSocketSession do
   defp notify_error(state, reason) do
     broadcast(state, %{"type" => "error", "reason" => to_string(reason)})
     state
+  end
+
+  # Records one backend message, retrying a failed write with backoff before
+  # giving up. Giving up closes the session and loses the message: the
+  # backend already sent it and won't send it again. A brief event store
+  # stall (Redix timeouts during a load burst) used to do exactly that on
+  # the first failure. Retrying keeps order, because the upstream reads
+  # nothing more from the backend until this frame is acknowledged.
+  defp record_backend(state, pid, ref, message, attempt) do
+    case append_once(state.session_id, message, attempt) do
+      {:ok, event} ->
+        send(pid, {:websocket_upstream_frame_recorded, ref})
+        {:noreply, deliver_event(state, event)}
+
+      {:error, reason} when attempt < @record_attempts ->
+        delay = Jitter.add_ms(@record_backoff_ms * Integer.pow(2, attempt - 1))
+
+        Logger.warning(
+          "WebSocket session #{state.session_id}: recording a backend message failed (#{inspect(reason)}); retry #{attempt} of #{@record_attempts - 1} in #{delay} ms"
+        )
+
+        Process.send_after(self(), {:record_backend, pid, ref, message, attempt + 1}, delay)
+        {:noreply, state}
+
+      {:error, reason} ->
+        stop_clients(state, 1011, "event store unavailable: #{inspect(reason)}")
+    end
+  end
+
+  # A write that timed out may have landed after all (Valkey ran it once it
+  # caught up). This session is its transcript's only writer, so if the
+  # newest entry is this message, the earlier attempt recorded it.
+  defp append_once(session_id, message, 1),
+    do: WebSocketStore.append(session_id, "backend", message)
+
+  defp append_once(session_id, message, _retry) do
+    case WebSocketStore.last(session_id) do
+      {:ok, %{direction: "backend", envelope: ^message} = event} -> {:ok, event}
+      {:ok, _other} -> WebSocketStore.append(session_id, "backend", message)
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp stop_clients(state, code, reason) do

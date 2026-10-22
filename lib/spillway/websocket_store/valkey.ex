@@ -140,6 +140,22 @@ defmodule Spillway.WebSocketStore.Valkey do
     end
   end
 
+  @doc "The newest entry in a transcript, or nil."
+  def last(session_hash) do
+    case Redix.command(conn(session_hash), [
+           "XREVRANGE",
+           key(session_hash),
+           "+",
+           "-",
+           "COUNT",
+           "1"
+         ]) do
+      {:ok, [entry]} -> {:ok, decode(entry)}
+      {:ok, []} -> {:ok, nil}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp oldest(session_hash) do
     case Redix.command(conn(session_hash), ["XRANGE", key(session_hash), "-", "+", "COUNT", "1"]) do
       {:ok, [[id | _] | _]} -> {:ok, parse_id(id)}
