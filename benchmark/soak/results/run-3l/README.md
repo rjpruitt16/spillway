@@ -105,13 +105,15 @@ it.
 A job runner that died mid-job (for example during a burst) left its job
 marked in flight in the store but no longer in the queue, and kept its
 concurrency slot, so nothing ran the job until the next kill or reboot
-recovered it. Between restarts the stranded jobs piled up: after the
-Oct 18 combined peak about 1,200-1,900 jobs sat unfinished until the 18:34
-kill recovered 2,053 of them, and at other checks the oldest outstanding
-job was 112-165 minutes old. After these files were fetched, between the
+recovered it. Between restarts unfinished jobs piled up: after the Oct 18
+combined peak about 1,200-1,900 jobs sat unfinished, and the 18:34 kill
+logged recovering 2,053 queued jobs, which brought outstanding back to
+30-170 (the run didn't confirm job by job that these were the same jobs).
+At other checks the oldest outstanding job was 112-165 minutes old. After these files were fetched, between the
 14:35 kill and 17:43 on Oct 22, the stranded set grew to about 5,500 jobs
-(the oldest 163 minutes) in steps at the hourly bursts. None were lost, since
-a restart recovers them, but each recovery adds duplicate webhooks. #72
+(the oldest 163 minutes) in steps at the hourly bursts. None were counted lost.
+Restarts with a large recovery also had the larger batches of duplicate
+webhooks (about 750), though the run didn't confirm that link. #72
 (merged after this run's build) monitors job runners so a dead one frees
 its slot and requeues its job.
 
