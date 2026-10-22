@@ -13,7 +13,7 @@ after that.
 
 Load: 500 jobs/s from 50 users, a 2,000/s burst every hour at :00, a
 1,000-session WebSocket burst every hour at :30, a daily ramp at 04:00 UTC
-(HTTP and WebSocket on alternate days), and a combined peak at 16:00 UTC.
+(HTTP and WebSocket on alternate days), and a combined peak at 16:15 UTC.
 Every few minutes the target API, the webhook receiver and the WebSocket
 backend switch between healthy, slow, 503s, 429s, dropping and down. A
 `kill -9` comes every 3-5 hours, and the first one after each 36 hours is a
@@ -30,7 +30,7 @@ full machine reboot instead.
 | Webhooks received (completed / failed) | 185.2M / 64k |
 | Restarts caused by the harness (`kill -9` and machine reboots) | 28 |
 | Full machine reboots | 3 (Oct 19 07:10, Oct 20 20:15, Oct 22 11:16 UTC) |
-| **Lost** (accepted, never finished) | **0** |
+| **Lost** (accepted, never finished) | **0** at the final snapshot; 234 jobs were still in flight then, the oldest 31 seconds old |
 | Lost inside the flush window of a kill | 0 |
 | Duplicate webhooks, all within 10 minutes of a restart | 9,956 |
 | Finished without a webhook | 262 |
@@ -47,7 +47,7 @@ Run 3j, before #69, had 36,316 jobs finished without a webhook.
 - **#69 worked.** 262 jobs finished without a webhook, against 36,316 in
   run 3j. Each is a webhook that used up its 10 retries during a receiver
   outage.
-- **Memory and disk level off.**
+- **Memory and disk level off; open files crept up.**
   - RSS at the end of each hour: median 908MB, highest 1,159MB. The daily
     maximum stayed between 1,031MB and 1,199MB, under the 1,200MB admission
     limit.
@@ -84,12 +84,18 @@ Run 3j, before #69, had 36,316 jobs finished without a webhook.
 | Oct 21 | 680 | 18:00-20:59, the backend's dropping slots and a kill |
 | Oct 22 | 1,709 | the 04:00 WebSocket ramp, which overlapped a kill |
 
-The largest jumps came when a Valkey write timed out after an HTTP burst.
-The WebSocket session then closed with 1011 and the backend message it was
-recording was dropped. #78 retries that write instead (idempotently, so a write that
-landed late isn't recorded twice). #78 merged after this run started, so the
-run measured the old behavior. 58,605 of these commands' messages arrived
-after the 5-minute cutoff, so many were late rather than gone.
+The largest jump (Oct 19) coincided with Valkey write timeouts after HTTP
+bursts, which crashed WebSocket session handlers. The run couldn't match
+the affected command IDs to those errors, so this is a correlation, not a
+proven cause. Reproducing it locally showed the mechanism: a timed-out
+write closed the session with 1011 and dropped the backend message being
+recorded. #78 now retries that write (idempotently, so a write that landed
+late isn't recorded twice). #78 merged after this run started, so the run
+measured the old behavior.
+
+Separately, 58,605 WebSocket messages arrived after their command's
+5-minute cutoff over the whole run. They couldn't be matched to these
+7,801 commands, so it isn't known how many of them eventually completed.
 
 The Oct 22 ramp window isn't fully explained: Spillway's logger was dropping
 lines at the time, and no Valkey errors appear for those minutes. #70 tracks
@@ -112,4 +118,6 @@ fields that Spillway doesn't report.
 `status.json`, `hourly.json` (112 hours), `daily.json`, `minutes.json` (the
 last 3 hours), `events.json` (the last 500 events) and `reports.json` (the
 monitoring agent's 18 reports), all fetched from the driver before it
-stopped.
+stopped. `reports.json` is kept as written; some of its elapsed-hour
+figures are wrong (for example "78h" at 00:50 Oct 20, about 54 hours in),
+so go by the timestamps.
