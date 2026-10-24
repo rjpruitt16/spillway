@@ -176,10 +176,48 @@ defmodule Spillway.IdempotentStore do
 
   defp gate_unlock(hashed), do: :ets.delete_object(@key_gate, {hashed, self()})
 
+  # The claim on a new key: held by a standalone submission from before its
+  # insert until its job is queued or deleted (admission or a full queue
+  # rejects after the insert, and the job is deleted). A retry with the key
+  # waits for that outcome. Without it the retry was answered as a
+  # duplicate with the ID of a job about to be deleted, so its caller held
+  # an ID that never finishes (the Canalis soak lost accepted jobs to this
+  # in Aquifer). Its own table, since a holder takes the key gate again
+  # inside check_or_insert. The holder may wait on its queue's GenServer,
+  # so waiters sleep instead of spinning.
+  @key_claims :idempotent_key_claims
+
+  @doc false
+  def with_new_key_claim(%Job{} = job, fun) do
+    hashed = hash_key(job)
+    claim_lock(hashed)
+
+    try do
+      fun.()
+    after
+      :ets.delete_object(@key_claims, {hashed, self()})
+    end
+  end
+
+  defp claim_lock(hashed) do
+    unless :ets.insert_new(@key_claims, {hashed, self()}) do
+      case :ets.lookup(@key_claims, hashed) do
+        [{^hashed, holder} = entry] when is_pid(holder) ->
+          unless Process.alive?(holder), do: :ets.delete_object(@key_claims, entry)
+
+        _ ->
+          :ok
+      end
+
+      Process.sleep(1)
+      claim_lock(hashed)
+    end
+  end
+
   @doc false
   def create_key_gate do
-    if :ets.whereis(@key_gate) == :undefined do
-      :ets.new(@key_gate, [
+    for table <- [@key_gate, @key_claims], :ets.whereis(table) == :undefined do
+      :ets.new(table, [
         :named_table,
         :public,
         :set,

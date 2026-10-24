@@ -112,6 +112,34 @@ defmodule Spillway.IntakeTest do
     refute match?({:rejected, _, _, _}, AccountQueueRegistry.submit(resubmit))
   end
 
+  # A retry that arrives while the first submission for its key is stored
+  # but not yet queued must wait for it. If the first is then rejected and
+  # deleted, the retry used to be told it was a duplicate of that deleted
+  # job, so its caller held a job ID that never finishes.
+  test "a retry during a submission that's then rejected is not given the deleted job" do
+    stamp = System.unique_integer([:positive])
+    base = "http://claim-#{stamp}.example"
+    first = job("claim-#{stamp}-1", "claimer", base)
+    actor = AccountQueueRegistry.actor_for(first)
+    UrlActor.update_max_concurrent(actor, 0)
+    retry = %{job("claim-#{stamp}-2", "claimer", base) | idempotent_key: first.idempotent_key}
+
+    result =
+      Spillway.IdempotentStore.with_new_key_claim(first, fn ->
+        # Stands in for the first submission between its insert and a
+        # rejection that deletes it.
+        :ok = Spillway.IdempotentStore.check_or_insert(first)
+        pending = Task.async(fn -> AccountQueueRegistry.submit(retry) end)
+        assert Task.yield(pending, 100) == nil, "the retry should wait for the first submission"
+        Spillway.IdempotentStore.delete_job(first)
+        pending
+      end)
+      |> Task.await(5_000)
+
+    assert {:accepted, %Job{id: id}} = result
+    assert id == retry.id
+  end
+
   test "concurrent submissions from one user stop exactly at the per-user limit" do
     System.put_env("SPILLWAY_MAX_PENDING_PER_USER", "5")
     stamp = System.unique_integer([:positive])

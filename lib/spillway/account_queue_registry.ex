@@ -77,10 +77,12 @@ defmodule Spillway.AccountQueueRegistry do
       # Refuse before storing when the queue is already full: see
       # Intake.precheck/2. The account-queue header can change which queue
       # the job lands in, so a submission that sets it skips the check.
-      with :allowed <- precheck(job, account_queue_header),
-           {:prepared, prepared} <- AccountQueue.prepare_submission(job, true) do
-        admit_here(pid, prepared, account_queue_header, :new)
-      end
+      IdempotentStore.with_new_key_claim(job, fn ->
+        with :allowed <- precheck(job, account_queue_header),
+             {:prepared, prepared} <- AccountQueue.prepare_submission(job, true) do
+          admit_here(pid, prepared, account_queue_header, :new)
+        end
+      end)
     else
       route_to_actor(pid, :submit, job, account_queue_header)
     end
@@ -100,10 +102,12 @@ defmodule Spillway.AccountQueueRegistry do
     pid = actor_for(job)
 
     if Cluster.standalone?() do
-      case AccountQueue.prepare_submission(job, false) do
-        {:prepared, prepared} -> admit_here(pid, prepared, account_queue_header, :internal)
-        other -> other
-      end
+      IdempotentStore.with_new_key_claim(job, fn ->
+        case AccountQueue.prepare_submission(job, false) do
+          {:prepared, prepared} -> admit_here(pid, prepared, account_queue_header, :internal)
+          other -> other
+        end
+      end)
     else
       route_to_actor(pid, :submit_internal, job, account_queue_header)
     end
