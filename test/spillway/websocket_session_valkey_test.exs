@@ -186,6 +186,43 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     assert Enum.map(entries, & &1.envelope["message_id"]) == ["e1", "c1"]
   end
 
+  # A lagging client's catch-up read that hits a Redix timeout used to close
+  # the client (1011). It must wait out the stall and still be sent what it
+  # missed (#70).
+  test "a lagging client rides out an event store stall during catch-up", %{admin: admin} do
+    session_id = "stall-catchup-#{System.unique_integer([:positive])}"
+
+    {:ok, session} =
+      WebSocketSession.start_link(
+        session_id: session_id,
+        upstream_url: "ws://127.0.0.1:1/ws",
+        config: WebSocketConfig.load()
+      )
+
+    test_pid = self()
+    assert {:ok, _replay} = WebSocketSession.attach(session, test_pid, "0-0")
+
+    {:ok, _} =
+      WebSocketStore.append(session_id, "backend", %{"type" => "event", "message_id" => "e1"})
+
+    # Make this client lagging with just enough in flight that one delivery
+    # receipt starts a catch-up read.
+    half = div(:sys.get_state(session).config.client_buffer, 2)
+
+    :sys.replace_state(session, fn state ->
+      update_in(state.clients[test_pid], &%{&1 | lagging: true, in_flight: half + 1})
+    end)
+
+    stall = Task.async(fn -> Redix.command(admin, ["DEBUG", "SLEEP", "6"], timeout: 10_000) end)
+    Process.sleep(100)
+    WebSocketSession.delivered(session, test_pid)
+
+    assert_receive {:websocket_event, %{"message_id" => "e1"}}, 20_000
+    refute_received {:websocket_close, _, _}
+    Task.await(stall, 10_000)
+    assert Map.has_key?(:sys.get_state(session).clients, test_pid)
+  end
+
   defp wait_until(fun, timeout_ms) do
     cond do
       fun.() -> :ok
