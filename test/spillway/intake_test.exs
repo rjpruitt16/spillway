@@ -165,8 +165,13 @@ defmodule Spillway.IntakeTest do
       end
 
     assert Spillway.IdempotentStore.claim_count() == before + 5
-    for pid <- holders, do: Process.exit(pid, :kill)
-    Process.sleep(20)
+
+    for pid <- holders do
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 1_000
+    end
+
     Spillway.IdempotentStore.sweep_dead_claims()
     assert Spillway.IdempotentStore.claim_count() == before
   end
