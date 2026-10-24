@@ -24,10 +24,14 @@ defmodule Spillway.WebSocketSession do
 
   @registry Spillway.WebSocketSessionRegistry
 
-  # A backend message that can't be recorded is retried after 200, 400,
-  # 800 and 1,600 ms (plus jitter) before the session gives up.
-  @record_attempts 5
+  # A backend message that can't be recorded, or a lagging client's
+  # catch-up read that fails, is retried with backoff (200 ms doubling to
+  # 2 s, plus jitter) for up to 30 s before the session gives up. Under a
+  # load burst the event store can stall for longer than Redix's 5 s
+  # timeout, several times over (#70).
+  @store_retry_ms 30_000
   @record_backoff_ms 200
+  @record_backoff_max_ms 2_000
 
   def start_link(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
@@ -81,7 +85,14 @@ defmodule Spillway.WebSocketSession do
       {:ok, messages, final_cursor} ->
         monitor = Process.monitor(client)
 
-        info = %{monitor: monitor, cursor: final_cursor, in_flight: 0, lagging: false}
+        info = %{
+          monitor: monitor,
+          cursor: final_cursor,
+          in_flight: 0,
+          lagging: false,
+          read_failing_since: nil
+        }
+
         clients = Map.put(state.clients, client, info)
         state = %{state | clients: clients}
         send(self(), :ensure_upstream)
@@ -295,6 +306,17 @@ defmodule Spillway.WebSocketSession do
   def handle_info({:record_backend, pid, ref, message, attempt}, state),
     do: record_backend(state, pid, ref, message, attempt)
 
+  # Stale if a delivery receipt's catch-up read succeeded in the meantime.
+  def handle_info({:retry_catch_up, client}, state) do
+    case Map.fetch(state.clients, client) do
+      {:ok, %{read_failing_since: since} = info} when since != nil ->
+        catch_up(state, client, info)
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
   def handle_info({:websocket_upstream_frame, pid, ref, _raw}, state) do
     send(pid, {:websocket_upstream_frame_recorded, ref})
     {:noreply, state}
@@ -449,7 +471,8 @@ defmodule Spillway.WebSocketSession do
           info
           | cursor: cursor,
             in_flight: info.in_flight + sent,
-            lagging: length(events) == limit
+            lagging: length(events) == limit,
+            read_failing_since: nil
         }
 
         state = put_in(state.clients[client], info)
@@ -469,10 +492,34 @@ defmodule Spillway.WebSocketSession do
         {:noreply, remove_client(state, client)}
 
       {:error, reason} ->
-        send(client, {:websocket_close, 1011, "event store unavailable: #{inspect(reason)}"})
-        {:noreply, remove_client(state, client)}
+        now = System.monotonic_time(:millisecond)
+        since = info.read_failing_since || now
+        delay = store_retry_delay(div(now - since, @record_backoff_ms) + 1)
+
+        if now + delay - since < @store_retry_ms do
+          if since == now do
+            Logger.warning(
+              "WebSocket session #{state.session_id}: a client's catch-up read failed (#{inspect(reason)}); retrying for up to #{@store_retry_ms} ms"
+            )
+          end
+
+          # Lagging, so live events wait for the read instead of skipping
+          # past what it hasn't delivered yet.
+          Process.send_after(self(), {:retry_catch_up, client}, delay)
+          info = %{info | lagging: true, read_failing_since: since}
+          {:noreply, put_in(state.clients[client], info)}
+        else
+          send(client, {:websocket_close, 1011, "event store unavailable: #{inspect(reason)}"})
+          {:noreply, remove_client(state, client)}
+        end
     end
   end
+
+  defp store_retry_delay(attempt),
+    do:
+      Jitter.add_ms(
+        min(@record_backoff_ms * Integer.pow(2, min(attempt, 10) - 1), @record_backoff_max_ms)
+      )
 
   # A client's own command advances the cursor of every client that is
   # receiving live events. A lagging client keeps its cursor: it still has
@@ -669,18 +716,20 @@ defmodule Spillway.WebSocketSession do
         state = deliver_event(%{state | pending_record: nil}, event)
         {:noreply, release_deferred(state)}
 
-      {:error, reason} when attempt < @record_attempts ->
-        delay = Jitter.add_ms(@record_backoff_ms * Integer.pow(2, attempt - 1))
-
-        Logger.warning(
-          "WebSocket session #{state.session_id}: recording a backend message failed (#{inspect(reason)}); retry #{attempt} of #{@record_attempts - 1} in #{delay} ms"
-        )
-
-        Process.send_after(self(), {:record_backend, pid, ref, frame, attempt + 1}, delay)
-        {:noreply, %{state | pending_record: ref}}
-
       {:error, reason} ->
-        stop_clients(state, 1011, "event store unavailable: #{inspect(reason)}")
+        {_message, _frame_id, started_ms} = frame
+        delay = store_retry_delay(attempt)
+
+        if System.system_time(:millisecond) + delay - started_ms < @store_retry_ms do
+          Logger.warning(
+            "WebSocket session #{state.session_id}: recording a backend message failed (#{inspect(reason)}); retry #{attempt} in #{delay} ms"
+          )
+
+          Process.send_after(self(), {:record_backend, pid, ref, frame, attempt + 1}, delay)
+          {:noreply, %{state | pending_record: ref}}
+        else
+          stop_clients(state, 1011, "event store unavailable: #{inspect(reason)}")
+        end
     end
   end
 
