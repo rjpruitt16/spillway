@@ -306,10 +306,14 @@ defmodule Spillway.WebSocketSession do
   def handle_info({:record_backend, pid, ref, message, attempt}, state),
     do: record_backend(state, pid, ref, message, attempt)
 
+  # Stale if a delivery receipt's catch-up read succeeded in the meantime.
   def handle_info({:retry_catch_up, client}, state) do
     case Map.fetch(state.clients, client) do
-      {:ok, info} -> catch_up(state, client, info)
-      :error -> {:noreply, state}
+      {:ok, %{read_failing_since: since} = info} when since != nil ->
+        catch_up(state, client, info)
+
+      _ ->
+        {:noreply, state}
     end
   end
 

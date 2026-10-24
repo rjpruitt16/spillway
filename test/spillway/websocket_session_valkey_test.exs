@@ -217,6 +217,12 @@ defmodule Spillway.WebSocketSessionValkeyTest do
     Process.sleep(100)
     WebSocketSession.delivered(session, test_pid)
 
+    # The read must actually have failed, so the retry path is what's tested.
+    wait_until(
+      fn -> :sys.get_state(session, 15_000).clients[test_pid].read_failing_since != nil end,
+      10_000
+    )
+
     assert_receive {:websocket_event, %{"message_id" => "e1"}}, 20_000
     refute_received {:websocket_close, _, _}
     Task.await(stall, 10_000)
