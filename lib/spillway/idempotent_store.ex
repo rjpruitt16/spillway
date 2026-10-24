@@ -199,6 +199,23 @@ defmodule Spillway.IdempotentStore do
     end
   end
 
+  @doc """
+  Drops claims whose holder died without releasing them (a request process
+  killed mid-submission skips its `after`). A retry takes over a dead
+  holder's claim on its own key; this covers keys nobody retries, so the
+  table can't grow with them. Spillway.Store runs it every minute.
+  """
+  def sweep_dead_claims do
+    @key_claims
+    |> :ets.tab2list()
+    |> Enum.each(fn {_hashed, holder} = entry ->
+      unless Process.alive?(holder), do: :ets.delete_object(@key_claims, entry)
+    end)
+  end
+
+  @doc false
+  def claim_count, do: :ets.info(@key_claims, :size)
+
   defp claim_lock(hashed) do
     unless :ets.insert_new(@key_claims, {hashed, self()}) do
       case :ets.lookup(@key_claims, hashed) do

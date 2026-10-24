@@ -140,6 +140,37 @@ defmodule Spillway.IntakeTest do
     assert id == retry.id
   end
 
+  test "a claim whose holder is killed is swept, even if its key never comes back" do
+    stamp = System.unique_integer([:positive])
+    base = "http://sweep-#{stamp}.example"
+    before = Spillway.IdempotentStore.claim_count()
+
+    holders =
+      for i <- 1..5 do
+        claimed = self()
+
+        pid =
+          spawn(fn ->
+            Spillway.IdempotentStore.with_new_key_claim(
+              job("sweep-#{stamp}-#{i}", "s", base),
+              fn ->
+                send(claimed, :claimed)
+                Process.sleep(:infinity)
+              end
+            )
+          end)
+
+        assert_receive :claimed, 1_000
+        pid
+      end
+
+    assert Spillway.IdempotentStore.claim_count() == before + 5
+    for pid <- holders, do: Process.exit(pid, :kill)
+    Process.sleep(20)
+    Spillway.IdempotentStore.sweep_dead_claims()
+    assert Spillway.IdempotentStore.claim_count() == before
+  end
+
   test "concurrent submissions from one user stop exactly at the per-user limit" do
     System.put_env("SPILLWAY_MAX_PENDING_PER_USER", "5")
     stamp = System.unique_integer([:positive])
