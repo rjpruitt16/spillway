@@ -270,16 +270,26 @@ defmodule Spillway.Store do
 
   # ---- GenServer: periodic log sync, close on shutdown ----
 
+  @claim_sweep_ms 60_000
+
   @impl true
   def init(nil) do
     Process.flag(:trap_exit, true)
     Spillway.IdempotentStore.create_key_gate()
     mark_synced(System.monotonic_time(:millisecond))
     schedule_sync()
+    Process.send_after(self(), :sweep_claims, @claim_sweep_ms)
     {:ok, nil}
   end
 
+
   @impl true
+  def handle_info(:sweep_claims, state) do
+    Spillway.IdempotentStore.sweep_dead_claims()
+    Process.send_after(self(), :sweep_claims, @claim_sweep_ms)
+    {:noreply, state}
+  end
+
   def handle_info(:sync, state) do
     started = System.monotonic_time(:millisecond)
     :rocksdb.sync_wal(db())
