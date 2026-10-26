@@ -28,7 +28,7 @@ Spillway is what I built to actually fix it: a self-hosted load balancer that ab
 
 What's usually behind that API can't scale instantly either: a GPU, a database, a CI runner. Spillway buys time for more of it to come online; it's overkill if that ceiling is fixed for good.
 
-Real numbers (durability, throughput ceiling, admission shedding, multi-tenant fairness, a real GPU under load, and a [112-hour soak with 0 lost jobs across 28 restarts](benchmark/soak/results/run-3l/README.md)) are in [benchmark.md](benchmark.md), including a head-to-head against [Aquifer](https://github.com/rjpruitt16/aquifer), the Go/SQLite sibling this project mirrors.
+Real numbers (durability, throughput ceiling, admission shedding, multi-tenant fairness, a real GPU under load, and a [112-hour soak with 0 lost jobs across 28 restarts](benchmark/soak/results/run-3l/README.md)) are in [benchmark.md](benchmark.md), including a head-to-head against [Aquifer](https://github.com/rjpruitt16/aquifer), the Go/SQLite sibling this project mirrors. Longer, end-to-end tests of the Aqueduct protocol in front of real open-source systems, starting with Hatchet behind Aquifer, are in [aqueduct-benchmarks](https://github.com/rjpruitt16/aqueduct-benchmarks).
 
 ![Traditional load balancing collapsing under a spike, round-robin flickering faster as instances die, versus Aqueduct pacing that keeps the fleet stable while an autoscaler brings real capacity online](docs/images/fleet-degradation.gif)
 
