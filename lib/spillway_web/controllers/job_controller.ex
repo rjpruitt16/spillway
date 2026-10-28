@@ -18,11 +18,14 @@ defmodule SpillwayWeb.JobController do
   # The caller of a direct /proxy gets one rate: the lower of Spillway's and
   # the target's own X-Aqueduct-Rps (X-Aquifer-Rps as a fallback).
   defp upstream_rps(headers) do
-    found = fn name ->
-      Enum.find_value(headers, fn {k, v} -> String.downcase(k) == name && v end)
+    # A malformed primary value mustn't hide a valid alias.
+    valid = fn name ->
+      Enum.find_value(headers, fn {k, v} ->
+        String.downcase(k) == name and match?({:ok, _}, positive(v)) and v
+      end)
     end
 
-    found.("x-aqueduct-rps") || found.("x-aquifer-rps")
+    valid.("x-aqueduct-rps") || valid.("x-aquifer-rps")
   end
 
   @doc false

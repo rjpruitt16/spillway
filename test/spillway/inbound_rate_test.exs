@@ -160,4 +160,11 @@ defmodule Spillway.InboundRateTest do
     assert lower.("160.00", "garbage") == "160.00"
     assert lower.(nil, nil) == nil
   end
+
+  test "caller rows are bounded: an oversized user_id isn't kept" do
+    InboundRate.observe(String.duplicate("x", 300), 1_000, true)
+    refute :ets.member(:spillway_inbound_callers, String.duplicate("x", 300))
+    InboundRate.observe("bounded-caller", 1_000, true)
+    assert :ets.member(:spillway_inbound_callers, "bounded-caller")
+  end
 end
