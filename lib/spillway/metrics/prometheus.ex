@@ -26,6 +26,9 @@ defmodule Spillway.Metrics.Prometheus do
   @max_targets 1000
   # How far back the fairness gauge compares service.
   @fairness_window_ms 60_000
+  # Fairness samples are at least this far apart, so the history stays small
+  # however often /metrics is scraped.
+  @sample_interval_ms 5_000
   @buckets [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600]
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -194,7 +197,12 @@ defmodule Spillway.Metrics.Prometheus do
         end
 
       history = if from, do: Enum.drop(history, from), else: history
-      kept = Map.put(kept, t.target, history ++ [current])
+
+      kept =
+        case List.last(history) do
+          {at, _} when now - at < @sample_interval_ms -> Map.put(kept, t.target, history)
+          _ -> Map.put(kept, t.target, history ++ [current])
+        end
 
       case history do
         [{_at, then} | _] when t.queues != [] ->

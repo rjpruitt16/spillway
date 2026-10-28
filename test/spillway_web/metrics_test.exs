@@ -103,6 +103,28 @@ defmodule SpillwayWeb.MetricsTest do
     assert Enum.all?(seen, &(elem(&1, 1) == [Spillway.NodeId.get()]))
   end
 
+  test "a caller can't pose as another node" do
+    url = start_backend()
+
+    params = %{
+      "user_id" => "metrics-spoof",
+      "idempotent_key" => "spoof-#{System.unique_integer([:positive])}",
+      "url" => url <> "/work",
+      "method" => "POST",
+      "headers" => %{"X-Aqueduct-Node-Id" => "fake", "x-aquifer-node-id" => "fake"}
+    }
+
+    assert JobController.create(build_conn(:post, "/jobs", params), params).status == 201
+    assert_receive {:seen, "/work", ids}, 5_000
+    assert ids == [Spillway.NodeId.get()]
+  end
+
+  test "fairness history stays bounded however often /metrics is scraped" do
+    for _ <- 1..200, do: scrape()
+    %{samples: samples} = :sys.get_state(Spillway.Metrics.Prometheus)
+    assert Enum.all?(samples, fn {_target, history} -> length(history) <= 2 end)
+  end
+
   test "a refused job is counted by reason" do
     Spillway.Metrics.admission_rejected("memory")
     assert scrape() =~ ~r/^spillway_admission_rejected_total\{reason="memory"\} [1-9]/m

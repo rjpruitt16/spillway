@@ -1351,7 +1351,14 @@ defmodule Spillway.AccountQueue do
        if(account_queue_enabled, do: "account", else: "shared")}
     ]
 
-    job_headers = Enum.map(job.headers, fn {k, v} -> {k, v} end)
+    # The node id is Spillway's to send: a caller's copy would let it pose as
+    # another node and skew how a backend divides its budget.
+    job_headers =
+      job.headers
+      |> Enum.reject(fn {k, _v} ->
+        String.downcase(to_string(k)) in ["x-aqueduct-node-id", "x-aquifer-node-id"]
+      end)
+      |> Enum.map(fn {k, v} -> {k, v} end)
     metric_headers = maybe_add_orca_opt_in(metric_headers, job_headers)
     {body, l8_headers} = maybe_seal_l8(job, dispatch_url)
     {sealed_type, l8_headers} = Map.pop(l8_headers, "Content-Type")
