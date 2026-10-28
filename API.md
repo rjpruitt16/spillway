@@ -20,6 +20,8 @@ Content-Type: application/json
 
 `webhook_url` is optional. Omit it when the caller only needs Spillway to execute the job and will use `GET /jobs/:id` or remote result storage if it needs the terminal result. When set, Spillway delivers the normal completion webhook.
 
+`SPILLWAY_ALLOWED_URL_DOMAINS` (comma-separated hostnames, e.g. `api.openai.com,internal.yourapp.com`) restricts which domains `url` may target; a subdomain of an allowed entry is permitted (`api.example.com` matches an allowlisted `example.com`). A job whose `url` is outside the list is refused with `400`. Unset by default, so every host is allowed. It applies to `url`-routed jobs and `POST /proxy`; pool-routed jobs (`pool_id`) have no caller-supplied destination to check. Spillway doesn't follow upstream redirects, so a redirect can't lead a job outside the list.
+
 `execute_before` is optional Unix time in milliseconds. Spillway checks it immediately before dispatch and before every retry. Work that has not started its next attempt by that time is never sent upstream; it becomes `failed` with reason `execution_deadline_exceeded`, remains pollable through the normal failed-result retention window, and emits the normal failed SSE/webhook event.
 
 **Response headers your API can return to control pacing:**
@@ -152,7 +154,7 @@ X-Aqueduct-Upstream-URL: wss://backend.internal/socket
 
 `session_id` identifies the session's transcript. `after` is the last stream ID the client processed and defaults to `0-0`. Spillway replays backend messages after that cursor before following live events. A cursor older than retained history returns **409** instead of silently skipping data.
 
-The trusted upstream URL must be absolute `ws://` or `wss://`. When `SPILLWAY_ALLOWED_URL_DOMAINS` is set, its comma-separated hosts are enforced as an allowlist. Gateway headers such as `Authorization` are forwarded; hop-by-hop and internal Aqueduct/Aquifer headers are stripped, and `X-Aqueduct-Session-ID` is injected upstream.
+The trusted upstream URL must be absolute `ws://` or `wss://`. It is subject to `SPILLWAY_ALLOWED_URL_DOMAINS`, the same allowlist jobs use. Gateway headers such as `Authorization` are forwarded; hop-by-hop and internal Aqueduct/Aquifer headers are stripped, and `X-Aqueduct-Session-ID` is injected upstream.
 
 ### Messages
 
