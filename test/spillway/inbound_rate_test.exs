@@ -118,6 +118,9 @@ defmodule Spillway.InboundRateTest do
   end
 
   test "splits the rate across active callers" do
+    # Other suites' /jobs requests leave callers active for a while.
+    :ets.delete_all_objects(:spillway_inbound_callers)
+
     for id <- ["split-a", "split-b", "split-c", "split-d"],
         do: InboundRate.observe(id, 1_000, true)
 
