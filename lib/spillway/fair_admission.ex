@@ -6,6 +6,9 @@ defmodule Spillway.FairAdmission do
 
   @default_max_pending_per_upstream 10_000
   @pressure_start 0.70
+  # How far past its budget an upstream's backlog may grow while queues at or
+  # below their fair share keep entering. Past it, every request is refused.
+  @fair_ceiling 1.25
 
   def max_pending_per_upstream do
     case Integer.parse(
@@ -37,6 +40,13 @@ defmodule Spillway.FairAdmission do
       max_backlog <= 0 ->
         {:allowed, snapshot}
 
+      # Past the budget only queues above their fair share are refused, so one
+      # large queue filling the budget doesn't lock out small ones.
+      projected_total > max_backlog and active_queues > 1 and
+        projected_queue <= max_backlog / active_queues and
+          projected_total <= @fair_ceiling * max_backlog ->
+        {:allowed, %{snapshot | admission_pressure: 1.0}}
+
       projected_total > max_backlog ->
         {:rejected, "upstream_queue",
          %{snapshot | admission_pressure: 1.0, rejection_probability: 1.0}}
@@ -48,7 +58,9 @@ defmodule Spillway.FairAdmission do
         start = @pressure_start * max_backlog
         pressure = clamp((projected_total - start) / (max_backlog - start))
         fair_share = max_backlog / active_queues
-        excess = clamp((projected_queue - fair_share) / (max_backlog - fair_share))
+        # A queue at twice its fair share or more is fully in excess, so at
+        # full pressure it is refused every time, before the budget fills.
+        excess = clamp((projected_queue - fair_share) / fair_share)
         probability = pressure * excess
 
         snapshot = %{

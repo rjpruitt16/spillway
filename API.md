@@ -41,11 +41,11 @@ Each upstream has a shared backlog budget `B`, defaulting to `SPILLWAY_MAX_PENDI
 ```text
 F        = B / N
 pressure = clamp((Q - 0.70B) / 0.30B, 0, 1)
-excess   = clamp((q - F) / (B - F), 0, 1)
+excess   = clamp((q - F) / F, 0, 1)
 P(429)   = pressure * excess
 ```
 
-A lone queue may use the whole budget. Below 70% pressure, idle capacity remains freely borrowable. Under congestion, above-share queues receive progressively more `429` responses while queues at or below `F` continue entering. If admission would put `Q` above `B`, it is rejected deterministically. Shared-queue mode uses `N=1`, so only the shared ceiling applies. Duplicate requests, recovered jobs, and internal webhook deliveries bypass fair admission; already-accepted work is never removed.
+A lone queue may use the whole budget. Below 70% pressure, idle capacity remains freely borrowable. Under congestion, above-share queues receive progressively more `429` responses while queues at or below `F` continue entering, and a queue at `2F` or more is refused every time once `Q` reaches `B`. If admission would put `Q` above `B`, it is rejected deterministically unless its queue is at or below `F` and there are other active queues: those keep entering, so one large queue that fills the budget doesn't lock out small ones, until `Q` reaches `1.25B`, past which every request is rejected. Shared-queue mode uses `N=1`, so only the shared ceiling applies. Duplicate requests, recovered jobs, and internal webhook deliveries bypass fair admission; already-accepted work is never removed.
 
 Accepted and fairness-rejected responses expose `X-Aqueduct-Active-Queues`, `X-Aqueduct-Upstream-Backlog`, `X-Aqueduct-Queue-Backlog`, and `X-Aqueduct-Admission-Pressure`, with `X-EZThrottle-*` aliases. Outbound dispatches include the active-queue and upstream-backlog values alongside the existing load headers. `GET /health` reports node-local totals under `queues`; Syn-connected siblings are used for an upstream's admission decision but are not mislabeled as local health state.
 

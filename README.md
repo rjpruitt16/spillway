@@ -108,7 +108,7 @@ X-Aqueduct-Account-Queue: enabled
 
 Either way, Spillway switches to per-user isolation: each `user_id` + API key gets its own queue. A heavy user no longer blocks everyone else.
 
-Above 70% of the shared upstream backlog budget, queues holding more than their current fair share receive progressively more `429` responses while smaller queues continue entering. One active queue can still use the entire budget. See [API.md](API.md#fair-queue-admission) for the formula and observability headers.
+Above 70% of the shared upstream backlog budget, queues holding more than their current fair share receive progressively more `429` responses while smaller queues continue entering, even once the budget is full (up to 125% of it). One active queue can still use the entire budget. See [API.md](API.md#fair-queue-admission) for the formula and observability headers.
 
 Critically, each user can run at a **different pace**. If your service processes requests from user A faster than user B, because of their tier, their data size, or just load at that moment, each user's queue drains independently at the rate their own responses signal back. A premium user responding with `X-Aqueduct-Rps: 50` runs at 50 RPS while a free-tier user on `X-Aqueduct-Rps: 2` runs at 2, in parallel, without either affecting the other. Note that literal pace (RPS/max-concurrent) can only ever be set by the upstream's own response headers, never by the client submitting the job, so a client can ask for isolation but never for a faster rate than what's configured.
 
