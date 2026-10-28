@@ -401,6 +401,7 @@ defmodule Spillway.AccountQueue do
   @impl true
   def handle_call(:snapshot, _from, state) do
     backlog = state.queued + state.in_flight
+
     snapshot = %{
       backlog: backlog,
       active: backlog > 0,
@@ -1074,7 +1075,9 @@ defmodule Spillway.AccountQueue do
 
   # A deadline caught before the request went out isn't an attempt.
   defp observe_attempt(_job, _upstream, {:error, "execution_deadline_exceeded", nil}), do: :ok
-  defp observe_attempt(job, upstream, {:ok, %{status: status}}), do: Metrics.observe_dispatch(job, upstream, status)
+
+  defp observe_attempt(job, upstream, {:ok, %{status: status}}),
+    do: Metrics.observe_dispatch(job, upstream, status)
 
   defp observe_attempt(job, upstream, {_kind, _reason, response}),
     do: Metrics.observe_dispatch(job, upstream, response && response.status)
@@ -1359,6 +1362,7 @@ defmodule Spillway.AccountQueue do
         String.downcase(to_string(k)) in ["x-aqueduct-node-id", "x-aquifer-node-id"]
       end)
       |> Enum.map(fn {k, v} -> {k, v} end)
+
     metric_headers = maybe_add_orca_opt_in(metric_headers, job_headers)
     {body, l8_headers} = maybe_seal_l8(job, dispatch_url)
     {sealed_type, l8_headers} = Map.pop(l8_headers, "Content-Type")
