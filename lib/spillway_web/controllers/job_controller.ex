@@ -58,7 +58,14 @@ defmodule SpillwayWeb.JobController do
   defp put_inbound_rps(conn, _opts) do
     case Spillway.InboundRate.advertised_rps(conn.params["user_id"]) do
       rps when is_number(rps) and rps > 0 ->
-        put_rps(conn, :erlang.float_to_binary(rps * 1.0, decimals: 2))
+        # Two decimals would round a tiny positive share (many callers at a
+        # low rate) to 0.00, which reads as no limit at all.
+        value =
+          if rps < 0.01,
+            do: :erlang.float_to_binary(rps * 1.0, [:short]),
+            else: :erlang.float_to_binary(rps * 1.0, decimals: 2)
+
+        put_rps(conn, value)
 
       _ ->
         conn
