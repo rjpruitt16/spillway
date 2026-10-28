@@ -161,9 +161,11 @@ defmodule Spillway.InboundRateTest do
     assert lower.(nil, nil) == nil
   end
 
-  test "caller rows are bounded: an oversized user_id isn't kept" do
-    InboundRate.observe(String.duplicate("x", 300), 1_000, true)
-    refute :ets.member(:spillway_inbound_callers, String.duplicate("x", 300))
+  test "a long user_id still counts as a caller, under a fixed-size key" do
+    long = String.duplicate("x", 300)
+    InboundRate.observe(long, 1_000, true)
+    refute :ets.member(:spillway_inbound_callers, long)
+    assert :ets.member(:spillway_inbound_callers, :crypto.hash(:sha256, long))
     InboundRate.observe("bounded-caller", 1_000, true)
     assert :ets.member(:spillway_inbound_callers, "bounded-caller")
   end

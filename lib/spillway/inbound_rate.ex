@@ -35,8 +35,9 @@ defmodule Spillway.InboundRate do
   @table :spillway_inbound_rate
   # Callers in their own table, so counting them is :ets.info's O(1) size.
   @callers :spillway_inbound_callers
-  # user_ids are caller-chosen: bound both the key and how many are kept
-  # between ticks. Past the cap, new callers share the rate unseen.
+  # user_ids are caller-chosen: bound both the key (a longer id is kept as
+  # its hash) and how many are kept between ticks. Past the cap, new callers
+  # share the rate unseen.
   @max_user_id_bytes 256
   @max_callers 10_000
   @tick_ms 1_000
@@ -123,10 +124,15 @@ defmodule Spillway.InboundRate do
     ArgumentError -> nil
   end
 
-  defp touch(user_id)
-       when is_binary(user_id) and user_id != "" and byte_size(user_id) <= @max_user_id_bytes do
-    if :ets.info(@callers, :size) < @max_callers or :ets.member(@callers, user_id),
-      do: :ets.insert(@callers, {user_id, System.monotonic_time(:millisecond)})
+  defp touch(user_id) when is_binary(user_id) and user_id != "" do
+    # A long id still counts as a caller, under a fixed-size key.
+    key =
+      if byte_size(user_id) > @max_user_id_bytes,
+        do: :crypto.hash(:sha256, user_id),
+        else: user_id
+
+    if :ets.info(@callers, :size) < @max_callers or :ets.member(@callers, key),
+      do: :ets.insert(@callers, {key, System.monotonic_time(:millisecond)})
   end
 
   defp touch(_user_id), do: :ok
