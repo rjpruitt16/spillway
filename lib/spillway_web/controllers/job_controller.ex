@@ -13,6 +13,67 @@ defmodule SpillwayWeb.JobController do
   alias SpillwayWeb.JobStreamController
 
   plug SpillwayWeb.NodeDraining when action in [:create, :proxy]
+  plug :put_inbound_rps when action in [:create, :proxy]
+
+  # The caller of a direct /proxy gets one rate: the lower of Spillway's and
+  # the target's own X-Aqueduct-Rps (X-Aquifer-Rps as a fallback).
+  defp upstream_rps(headers) do
+    # A malformed primary value mustn't hide a valid alias.
+    valid = fn name ->
+      Enum.find_value(headers, fn {k, v} ->
+        String.downcase(k) == name and match?({:ok, _}, positive(v)) and v
+      end)
+    end
+
+    valid.("x-aqueduct-rps") || valid.("x-aquifer-rps")
+  end
+
+  @doc false
+  def lower_rps(a, b) do
+    case {positive(a), positive(b)} do
+      {{:ok, av}, {:ok, bv}} -> if bv < av, do: b, else: a
+      {{:ok, _}, _} -> a
+      {_, {:ok, _}} -> b
+      _ -> nil
+    end
+  end
+
+  defp positive(value) when is_binary(value) do
+    case Float.parse(value) do
+      {n, ""} when n > 0 -> {:ok, n}
+      _ -> :error
+    end
+  end
+
+  defp positive(_value), do: :error
+
+  defp put_rps(conn, nil), do: conn
+
+  defp put_rps(conn, rps) do
+    conn
+    |> put_resp_header("x-aqueduct-rps", rps)
+    |> put_resp_header("x-aquifer-rps", rps)
+  end
+
+  # Advertises this caller's share of Spillway's own inbound capacity, so a
+  # caller that honors X-Aqueduct-Rps (Canalis, another Spillway or Aquifer)
+  # paces itself. Set before anything else, so 429s carry it too.
+  defp put_inbound_rps(conn, _opts) do
+    case Spillway.InboundRate.advertised_rps(conn.params["user_id"]) do
+      rps when is_number(rps) and rps > 0 ->
+        # Two decimals would round a tiny positive share (many callers at a
+        # low rate) to 0.00, which reads as no limit at all.
+        value =
+          if rps < 0.01,
+            do: :erlang.float_to_binary(rps * 1.0, [:short]),
+            else: :erlang.float_to_binary(rps * 1.0, decimals: 2)
+
+        put_rps(conn, value)
+
+      _ ->
+        conn
+    end
+  end
 
   def create(conn, params) do
     case Job.new(with_max_retries_header(conn, params)) do
@@ -90,7 +151,16 @@ defmodule SpillwayWeb.JobController do
         stream_or_status_for_duplicate(conn, existing_job)
 
       {:direct, _job, response} ->
-        conn = Enum.reduce(response.headers, conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+        ours = conn |> get_resp_header("x-aqueduct-rps") |> List.first()
+
+        conn =
+          response.headers
+          |> Enum.reject(fn {k, _v} ->
+            String.downcase(k) in ["x-aqueduct-rps", "x-aquifer-rps"]
+          end)
+          |> Enum.reduce(conn, fn {k, v}, c -> put_resp_header(c, k, v) end)
+          |> put_rps(lower_rps(ours, upstream_rps(response.headers)))
+
         send_resp(conn, response.status, response.body)
 
       {:fallback, job, reason} ->

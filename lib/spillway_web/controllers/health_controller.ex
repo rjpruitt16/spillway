@@ -10,6 +10,7 @@ defmodule SpillwayWeb.HealthController do
       l8_protocol: Spillway.L8.version(),
       l8_public_key: Spillway.L8.pub_b64(),
       admission: Spillway.Admission.snapshot(),
+      inbound: Spillway.InboundRate.snapshot(),
       queues: Spillway.AccountQueueRegistry.node_queue_snapshot(),
       pools: Spillway.PoolRegistry.snapshot(),
       websocket:

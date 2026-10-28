@@ -55,6 +55,25 @@ Every response also carries `X-Aqueduct-Fullness`: how full this node is, `0`–
 
 Every response also carries this node's load, once it has a first reading: `X-Aqueduct-Http-Users`, `X-Aqueduct-Http-Capacity`, `X-Aqueduct-WS-Sessions` and `X-Aqueduct-WS-Capacity`, the same numbers as the registration ping ([REGISTRATION.md](REGISTRATION.md#load-http-users-and-websocket-sessions)).
 
+### Inbound pacing (`X-Aqueduct-Rps`)
+
+Always on. Spillway tells its own callers how fast to submit: every `/jobs` and `/proxy` response, `429`s included, carries `X-Aqueduct-Rps` (alias `X-Aquifer-Rps`), the same header a target API uses to pace Spillway. A gateway like Canalis, another Spillway or Aquifer, or any client that honors the header slows down before Spillway has to start returning `429`s. A caller that ignores it loses nothing. It works the same as Aquifer's, with the same constants.
+
+| Env var | Default | Description |
+|---|---:|---|
+| `SPILLWAY_INBOUND_BENCHMARK_RPS` | `400` | Jobs per second you believe this machine can take end to end; the first guess at the knee |
+| `SPILLWAY_INBOUND_START_PERCENT` | `40` | Where the advertised rate starts, as a percent of the benchmark |
+
+**How it moves.** Once a second the controller compares what callers sent against three signals:
+
+- **Insert latency.** The p95 time to durably store a job, against a healthy baseline (the lowest p95 seen, drifting up slowly). Above 1.5x the baseline plus 2ms means storage is saturated.
+- **Backlog growth.** Accepted work waiting to be dispatched. If it grows for 3 ticks in a row, Spillway is accepting faster than it can dispatch, even when inserts still look fast.
+- **Sync lag.** How long accepted jobs may have gone without reaching disk (`admission.sync_lag_ms` on `GET /health`). Inserts don't wait for the disk, so their latency stays low however far behind it falls, and a machine crash loses everything since the last sync. Over 500ms, the disk is behind. Admission starts refusing at `SPILLWAY_MAX_SYNC_LAG_MS` (1s); slowing callers first keeps the lag from getting there.
+
+When any signal trips, the rate is cut by 30%, and the rate just under where it failed becomes the learned knee. Within one congestion episode it cuts once, then holds for up to 10 ticks while admitted work drains, so one slow patch doesn't drive the rate to the floor. While healthy, it grows 1.5x per tick below the knee and 5% per tick above it, and only when callers actually use at least 80% of what was advertised (unused headroom is never inflated). If callers send more than 1.5x the advertised rate, it holds instead of cutting: that is a client ignoring the header, and admission control handles it.
+
+The total is split evenly across active callers (any `user_id` seen in the last 3 seconds), so `X-Aqueduct-Rps` is a per-caller number. `GET /health` shows the controller's last decision under `inbound`.
+
 ### Region-local queue ownership
 
 Spillway uses libcluster for optional BEAM discovery and Syn for queue ownership. When `DNS_CLUSTER_QUERY` is set, connected nodes agree on one `AccountQueue` owner for each upstream and queue key; a request received by any node is routed to that owner before idempotency admission, persistence, and enqueueing. Pacing state and circuit-breaker changes are propagated between the upstream's URL actors. Without `DNS_CLUSTER_QUERY`, the same code path runs as a standalone one-node cluster.
