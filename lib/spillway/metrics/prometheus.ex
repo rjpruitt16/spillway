@@ -180,7 +180,8 @@ defmodule Spillway.Metrics.Prometheus do
   # when they were all served equally. Queues created within the window are
   # left out, since a newcomer's short history would look like unfairness.
   # Samples for targets with no queues left are dropped.
-  defp fairness(targets, samples, now) do
+  @doc false
+  def fairness(targets, samples, now) do
     Enum.reduce(targets, {%{}, %{}}, fn t, {indexes, kept} ->
       current = {now, Map.new(t.queues, &{&1.queue_key, &1.served})}
       history = Map.get(samples, t.target, [])

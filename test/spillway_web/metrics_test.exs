@@ -119,10 +119,20 @@ defmodule SpillwayWeb.MetricsTest do
     assert ids == [Spillway.NodeId.get()]
   end
 
+  # One queue with work waiting, scraped every 100ms for two minutes: the
+  # history keeps one sample per 5s across the 60s window, not one per scrape.
   test "fairness history stays bounded however often /metrics is scraped" do
-    for _ <- 1..200, do: scrape()
-    %{samples: samples} = :sys.get_state(Spillway.Metrics.Prometheus)
-    assert Enum.all?(samples, fn {_target, history} -> length(history) <= 2 end)
+    queue = %{queue_key: "q", served: 0, backlog: 1}
+    targets = [%{target: "t", queues: [queue]}]
+
+    samples =
+      Enum.reduce(0..1_199, %{}, fn i, samples ->
+        {_index, samples} = Spillway.Metrics.Prometheus.fairness(targets, samples, i * 100)
+        samples
+      end)
+
+    history = Map.fetch!(samples, "t")
+    assert length(history) in 12..14
   end
 
   test "a refused job is counted by reason" do
