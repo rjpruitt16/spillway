@@ -22,6 +22,8 @@ defmodule SpillwayWeb.Router do
   end
 
   scope "/", SpillwayWeb do
+    # Prometheus text, not JSON: outside the :api pipeline's plug :accepts.
+    get "/metrics", MetricsController, :index
     get "/jobs/:id/stream", JobStreamController, :stream
     get "/websocket", WebSocketController, :connect
     # Own scope, not the :api pipeline's plug :accepts, ["json"] -- like

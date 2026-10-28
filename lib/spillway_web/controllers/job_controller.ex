@@ -195,6 +195,7 @@ defmodule SpillwayWeb.JobController do
   defp maybe_put_result(payload, result), do: Map.put(payload, :result, result)
 
   defp admission_rejected(conn, reason, limit, current) do
+    Spillway.Metrics.admission_rejected(reason)
     retry_after = Admission.retry_after_seconds()
 
     conn

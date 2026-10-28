@@ -12,7 +12,7 @@ import Config
 
 config :spillway,
   generators: [timestamp_type: :utc_datetime],
-  metrics_adapter: Spillway.Metrics.Noop
+  metrics_adapter: Spillway.Metrics.Prometheus
 
 config :syn,
   scopes: [:ezthrottle_account_queues, :ezthrottle_job_stores],
