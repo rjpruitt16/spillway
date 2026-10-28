@@ -724,7 +724,15 @@ defmodule Spillway.AccountQueue do
   AccountQueueRegistry.submit/2.
   """
   def prepare_submission(job, enforce_admission) do
-    case IdempotentStore.check_or_insert(job) do
+    started = System.monotonic_time(:microsecond)
+    inserted = IdempotentStore.check_or_insert(job)
+
+    if job.kind == :user do
+      elapsed = System.monotonic_time(:microsecond) - started
+      Spillway.InboundRate.observe(job.user_id, elapsed, inserted == :ok)
+    end
+
+    case inserted do
       {:duplicate, existing_id} ->
         {:duplicate, existing_id}
 

@@ -261,7 +261,8 @@ defmodule Spillway.Store do
 
   defp write_options, do: if(sync_interval_ms() == 0, do: [sync: true], else: [])
 
-  defp sync_interval_ms do
+  @doc "How often the log is synced in the background (ms), 0 when every write syncs."
+  def sync_interval_ms do
     case Integer.parse(System.get_env("SPILLWAY_STORE_SYNC_INTERVAL_MS", "")) do
       {n, ""} when n >= 0 -> n
       _ -> @default_sync_interval_ms
