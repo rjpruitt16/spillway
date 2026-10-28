@@ -77,6 +77,7 @@ defmodule Spillway.Job do
          {:ok, webhook_max_retries} <-
            parse_webhook_max_retries(Map.get(params, "webhook_max_retries")),
          :ok <- require_exactly_one_of_url_or_pool_id(url, pool_id),
+         :ok <- require_allowed_url(url),
          {:ok, method} <- require_field(params, "method"),
          {:ok, idempotent_key} <- require_field(params, "idempotent_key"),
          {:ok, execute_before} <- parse_execute_before(Map.get(params, "execute_before")) do
@@ -212,6 +213,16 @@ defmodule Spillway.Job do
     do: {:error, "url and pool_id are mutually exclusive -- a job dispatches to one or the other"}
 
   defp require_exactly_one_of_url_or_pool_id(_url, _pool_id), do: :ok
+
+  # Pool-routed jobs have no caller-supplied destination to check.
+  defp require_allowed_url(nil), do: :ok
+
+  defp require_allowed_url(url) do
+    if Spillway.UrlPolicy.allowed_url?(url),
+      do: :ok,
+      else:
+        {:error, "url domain is not in the configured allowlist (SPILLWAY_ALLOWED_URL_DOMAINS)"}
+  end
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil

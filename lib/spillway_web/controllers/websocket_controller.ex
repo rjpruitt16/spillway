@@ -145,7 +145,7 @@ defmodule SpillwayWeb.WebSocketController do
   defp validate_upstream(raw) when is_binary(raw) do
     case URI.parse(raw) do
       %URI{scheme: scheme, host: host} when scheme in ["ws", "wss"] and is_binary(host) ->
-        if allowed_host?(host), do: :ok, else: {:error, :upstream_not_allowed}
+        if Spillway.UrlPolicy.allowed_host?(host), do: :ok, else: {:error, :upstream_not_allowed}
 
       _ ->
         {:error, :invalid_upstream}
@@ -153,19 +153,6 @@ defmodule SpillwayWeb.WebSocketController do
   end
 
   defp validate_upstream(_raw), do: {:error, :invalid_upstream}
-
-  defp allowed_host?(host) do
-    case System.get_env("SPILLWAY_ALLOWED_URL_DOMAINS", "") do
-      "" ->
-        true
-
-      allowlist ->
-        Enum.any?(String.split(allowlist, ","), fn allowed ->
-          allowed = String.trim(allowed)
-          allowed != "" and (host == allowed or String.ends_with?(host, "." <> allowed))
-        end)
-    end
-  end
 
   defp forwarded_headers(conn, session_id) do
     blocked = [
