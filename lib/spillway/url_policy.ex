@@ -8,16 +8,19 @@ defmodule Spillway.UrlPolicy do
 
   @doc """
   Whether `host` is in SPILLWAY_ALLOWED_URL_DOMAINS (comma-separated; a domain
-  also allows its subdomains). An empty list allows every host.
+  also allows its subdomains). An empty list allows every host. Host names
+  compare without case, as DNS does.
   """
   def allowed_host?(host) when is_binary(host) do
+    host = String.downcase(host)
+
     case System.get_env("SPILLWAY_ALLOWED_URL_DOMAINS", "") do
       "" ->
         true
 
       allowlist ->
         Enum.any?(String.split(allowlist, ","), fn allowed ->
-          allowed = String.trim(allowed)
+          allowed = allowed |> String.trim() |> String.downcase()
           allowed != "" and (host == allowed or String.ends_with?(host, "." <> allowed))
         end)
     end

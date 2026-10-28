@@ -8,7 +8,14 @@ defmodule Spillway.UrlPolicyTest do
   alias Spillway.Job
 
   setup do
-    on_exit(fn -> System.delete_env("SPILLWAY_ALLOWED_URL_DOMAINS") end)
+    original = System.get_env("SPILLWAY_ALLOWED_URL_DOMAINS")
+    System.delete_env("SPILLWAY_ALLOWED_URL_DOMAINS")
+
+    on_exit(fn ->
+      if original,
+        do: System.put_env("SPILLWAY_ALLOWED_URL_DOMAINS", original),
+        else: System.delete_env("SPILLWAY_ALLOWED_URL_DOMAINS")
+    end)
   end
 
   defp job(url),
@@ -24,6 +31,7 @@ defmodule Spillway.UrlPolicyTest do
     assert {:ok, _} = job("https://example.com/work")
     assert {:ok, _} = job("https://api.example.com/work")
     assert {:ok, _} = job("https://api.openai.com/v1")
+    assert {:ok, _} = job("https://API.Example.com/work")
 
     assert {:error, "url domain is not in the configured allowlist" <> _} =
              job("https://evil.com/")
@@ -42,5 +50,20 @@ defmodule Spillway.UrlPolicyTest do
                "pool_id" => "p",
                "method" => "POST"
              })
+  end
+
+  test "a url that isn't a string is a 400, not a crash, on /jobs and /proxy" do
+    params = %{"user_id" => "u", "idempotent_key" => "k", "url" => 123, "method" => "POST"}
+    assert {:error, "url must be a string"} = Job.new(params)
+
+    for {action, path} <- [create: "/jobs", proxy: "/proxy"] do
+      conn =
+        apply(SpillwayWeb.JobController, action, [
+          Phoenix.ConnTest.build_conn(:post, path, params),
+          params
+        ])
+
+      assert conn.status == 400, "#{path} answered #{conn.status}"
+    end
   end
 end

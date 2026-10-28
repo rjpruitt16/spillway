@@ -216,6 +216,7 @@ defmodule Spillway.Job do
 
   # Pool-routed jobs have no caller-supplied destination to check.
   defp require_allowed_url(nil), do: :ok
+  defp require_allowed_url(url) when not is_binary(url), do: {:error, "url must be a string"}
 
   defp require_allowed_url(url) do
     if Spillway.UrlPolicy.allowed_url?(url),
