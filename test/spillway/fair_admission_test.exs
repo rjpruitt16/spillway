@@ -38,4 +38,24 @@ defmodule Spillway.FairAdmissionTest do
 
     assert four_queues.rejection_probability > two_queues.rejection_probability
   end
+
+  test "a full budget still admits queues at or below their fair share" do
+    # One queue holds the whole budget; a small one keeps entering.
+    assert {:allowed, small} = FairAdmission.decide(3, 100, 2, 100, 0.99)
+    assert small.admission_pressure == 1.0
+    assert {:rejected, "upstream_queue", _} = FairAdmission.decide(97, 100, 2, 100, 0.0)
+  end
+
+  test "past 125% of the budget every request is refused" do
+    assert {:allowed, _} = FairAdmission.decide(10, 123, 2, 100, 0.99)
+    assert {:rejected, "upstream_queue", _} = FairAdmission.decide(10, 125, 2, 100, 0.0)
+  end
+
+  test "a queue at twice its fair share is refused every time at full pressure" do
+    # F = 50; the queue would hold 100 with the budget about to fill.
+    assert {:rejected, "queue_fair_share", snapshot} =
+             FairAdmission.decide(99, 99, 2, 100, 0.999)
+
+    assert snapshot.rejection_probability == 1.0
+  end
 end
