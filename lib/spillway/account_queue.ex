@@ -68,7 +68,9 @@ defmodule Spillway.AccountQueue do
     # used to be unmonitored: one that crashed left its slot counted in
     # flight and its job unfinished in the store, out of the queue, until
     # the node restarted (soak run 3l: about 2,000 such jobs after a peak).
-    runners: %{}
+    runners: %{},
+    # Jobs this queue has finished, for the fairness gauge on GET /metrics.
+    served: 0
   ]
 
   # ---- Public API ----
@@ -399,7 +401,17 @@ defmodule Spillway.AccountQueue do
   @impl true
   def handle_call(:snapshot, _from, state) do
     backlog = state.queued + state.in_flight
-    {:reply, %{backlog: backlog, active: backlog > 0}, state, remaining_idle_timeout()}
+
+    snapshot = %{
+      backlog: backlog,
+      active: backlog > 0,
+      upstream: state.upstream,
+      queue_key: state.queue_key,
+      rps: state.rps,
+      served: state.served
+    }
+
+    {:reply, snapshot, state, remaining_idle_timeout()}
   end
 
   @impl true
@@ -826,6 +838,7 @@ defmodule Spillway.AccountQueue do
     delivery = webhook_delivery(IdempotentStore.get_delivery_mode(job.id), job, payload)
     webhook = IdempotentStore.finish(job.id, :failed, delivery)
     Metrics.job_failed(job.user_id, upstream, reason)
+    Metrics.observe_job_finished(job, upstream, "expired", 0)
 
     Phoenix.PubSub.broadcast(
       Spillway.PubSub,
@@ -871,6 +884,7 @@ defmodule Spillway.AccountQueue do
     upstream = Metrics.upstream(job.pool_id || dispatch_url)
 
     Metrics.job_dispatched(job.user_id, upstream)
+    Metrics.observe_job_waited(job, upstream)
 
     Phoenix.PubSub.broadcast(
       Spillway.PubSub,
@@ -883,6 +897,7 @@ defmodule Spillway.AccountQueue do
     )
 
     result = attempt_once(job, dispatch_url, flow_rate, max_concurrent, queue_key)
+    observe_attempt(job, upstream, result)
 
     case result do
       {:ok, %{status: status, body: body, headers: resp_headers}} ->
@@ -921,6 +936,8 @@ defmodule Spillway.AccountQueue do
           upstream,
           System.monotonic_time(:millisecond) - started_at
         )
+
+        Metrics.observe_job_finished(job, upstream, "completed", status)
 
         Phoenix.PubSub.broadcast(
           Spillway.PubSub,
@@ -1056,6 +1073,15 @@ defmodule Spillway.AccountQueue do
     end
   end
 
+  # A deadline caught before the request went out isn't an attempt.
+  defp observe_attempt(_job, _upstream, {:error, "execution_deadline_exceeded", nil}), do: :ok
+
+  defp observe_attempt(job, upstream, {:ok, %{status: status}}),
+    do: Metrics.observe_dispatch(job, upstream, status)
+
+  defp observe_attempt(job, upstream, {_kind, _reason, response}),
+    do: Metrics.observe_dispatch(job, upstream, response && response.status)
+
   defp runner_exit_reason(reason),
     do: "job_runner_exited: " <> String.slice(inspect(reason), 0, 200)
 
@@ -1074,6 +1100,10 @@ defmodule Spillway.AccountQueue do
     delivery = webhook_delivery(IdempotentStore.get_delivery_mode(job.id), job, failed_payload)
     webhook = IdempotentStore.finish(job.id, :failed, delivery)
     Metrics.job_failed(job.user_id, upstream, to_string(reason))
+
+    # A deadline that passes before a retry is expired, as in the queue.
+    outcome = if to_string(reason) == "execution_deadline_exceeded", do: "expired", else: "failed"
+    Metrics.observe_job_finished(job, upstream, outcome, response && response.status)
 
     Phoenix.PubSub.broadcast(
       Spillway.PubSub,
@@ -1185,7 +1215,7 @@ defmodule Spillway.AccountQueue do
 
   defp complete_user_job(state, user_id) do
     user_release(self(), user_id)
-    state
+    %{state | served: state.served + 1}
   end
 
   defp no_pool_members_retry_ms,
@@ -1298,7 +1328,11 @@ defmodule Spillway.AccountQueue do
     account_queue_enabled = queue_key != :shared
     queue_key_header = if account_queue_enabled, do: to_string(queue_key), else: "shared"
 
+    node_id = Spillway.NodeId.get()
+
     metric_headers = [
+      {"x-aqueduct-node-id", node_id},
+      {"x-aquifer-node-id", node_id},
       {"x-aqueduct-total-jobs", to_string(total)},
       {"x-aqueduct-queue-depth", to_string(depth)},
       {"x-aqueduct-flow-rate", :erlang.float_to_binary(flow_rate * 1.0, [{:decimals, 2}])},
@@ -1320,7 +1354,15 @@ defmodule Spillway.AccountQueue do
        if(account_queue_enabled, do: "account", else: "shared")}
     ]
 
-    job_headers = Enum.map(job.headers, fn {k, v} -> {k, v} end)
+    # The node id is Spillway's to send: a caller's copy would let it pose as
+    # another node and skew how a backend divides its budget.
+    job_headers =
+      job.headers
+      |> Enum.reject(fn {k, _v} ->
+        String.downcase(to_string(k)) in ["x-aqueduct-node-id", "x-aquifer-node-id"]
+      end)
+      |> Enum.map(fn {k, v} -> {k, v} end)
+
     metric_headers = maybe_add_orca_opt_in(metric_headers, job_headers)
     {body, l8_headers} = maybe_seal_l8(job, dispatch_url)
     {sealed_type, l8_headers} = Map.pop(l8_headers, "Content-Type")

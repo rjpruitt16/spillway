@@ -125,6 +125,7 @@ defmodule SpillwayWeb.JobController do
         JobStreamController.relay_stream(conn, request_id, region)
 
       {:redirect_exhausted, job_id} ->
+        Spillway.Metrics.admission_rejected("redirect_exhausted")
         retry_after = Redirect.exhausted_retry_after_seconds()
 
         conn
@@ -195,6 +196,7 @@ defmodule SpillwayWeb.JobController do
   defp maybe_put_result(payload, result), do: Map.put(payload, :result, result)
 
   defp admission_rejected(conn, reason, limit, current) do
+    Spillway.Metrics.admission_rejected(reason)
     retry_after = Admission.retry_after_seconds()
 
     conn

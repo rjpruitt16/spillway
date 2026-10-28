@@ -49,7 +49,7 @@ P(429)   = pressure * excess
 
 A lone queue may use the whole budget. Below 70% pressure, idle capacity remains freely borrowable. Under congestion, above-share queues receive progressively more `429` responses while queues at or below `F` continue entering, and a queue at `2F` or more is refused every time once `Q` reaches `B`. If admission would put `Q` above `B`, it is rejected deterministically unless its queue is at or below `F` and there are other active queues: those keep entering, so one large queue that fills the budget doesn't lock out small ones, until `Q` reaches `1.25B`, past which every request is rejected. Shared-queue mode uses `N=1`, so only the shared ceiling applies. Duplicate requests, recovered jobs, and internal webhook deliveries bypass fair admission; already-accepted work is never removed.
 
-Accepted and fairness-rejected responses expose `X-Aqueduct-Active-Queues`, `X-Aqueduct-Upstream-Backlog`, `X-Aqueduct-Queue-Backlog`, and `X-Aqueduct-Admission-Pressure`, with `X-EZThrottle-*` aliases. Outbound dispatches include the active-queue and upstream-backlog values alongside the existing load headers. `GET /health` reports node-local totals under `queues`; Syn-connected siblings are used for an upstream's admission decision but are not mislabeled as local health state.
+Accepted and fairness-rejected responses expose `X-Aqueduct-Active-Queues`, `X-Aqueduct-Upstream-Backlog`, `X-Aqueduct-Queue-Backlog`, and `X-Aqueduct-Admission-Pressure`, with `X-EZThrottle-*` aliases. Outbound dispatches include the active-queue and upstream-backlog values alongside the existing load headers, and `X-Aqueduct-Node-Id` (alias `X-Aquifer-Node-Id`): this node's id, so a backend can count the distinct ids to know how many nodes are sending to it and divide its budget between them. It's `SPILLWAY_NODE_ID`, else `FLY_MACHINE_ID`, else the host name. `GET /health` reports node-local totals under `queues`; Syn-connected siblings are used for an upstream's admission decision but are not mislabeled as local health state.
 
 Every response also carries `X-Aqueduct-Fullness`: how full this node is, `0`–`100`, the same contract as Aquifer's. It's the most-constrained of the limits this node already enforces: memory against `SPILLWAY_MEMORY_LIMIT_MB`, the Mnesia directory against `SPILLWAY_DB_MAX_BYTES`, the store write backlog against `SPILLWAY_STORE_MAX_BACKLOG`, and the fullest upstream's backlog against its backlog budget. Limits that are switched off don't count. Unlike `X-Aqueduct-Admission-Pressure`, which stays at `0` until fair admission's 70% starting point, fullness rises from the first queued job, so whatever sits in front of the node (a gateway like Canalis, or a client) can see it filling up before it pushes back. It's set before the in-flight limit, so the node's own `429`s and `503`s carry it too, and it's in the registration ping as `fullness` ([REGISTRATION.md](REGISTRATION.md)). Sampled at most every 250ms.
 
@@ -305,6 +305,26 @@ durable `result` object with the same terminal payload delivered over SSE/webhoo
 ```
 
 Terminal duplicate submissions return the same stored result inline with `duplicate: true`.
+
+## GET /metrics
+
+Prometheus text format, on the same port as `/health`. Served by default through the built-in metrics adapter (`Spillway.Metrics.Prometheus`); with a custom `:metrics_adapter` it's a 404. Like `/health`, everything is this node's own. The metrics match Aquifer's, under `spillway_` instead of `aquifer_`.
+
+| Metric | Type | Labels | What |
+|---|---|---|---|
+| `spillway_jobs_total` | counter | `target`, `outcome` | Jobs that reached a terminal state: `completed`, `failed` or `expired` |
+| `spillway_dispatch_attempts_total` | counter | `target`, `status_class` | Attempts at the target API, retries included: `2xx`, `4xx`, `429`, `5xx`, or `error` (no response) |
+| `spillway_queue_wait_seconds` | histogram | `target` | Submission to first dispatch: time spent waiting in Spillway |
+| `spillway_job_duration_seconds` | histogram | `target`, `outcome` | Submission to terminal state: end to end |
+| `spillway_admission_rejected_total` | counter | `reason` | Jobs refused with `429`: `memory`, `db_size`, `sync_lag`, `store_backlog`, `upstream_queue`, `queue_fair_share`, ... |
+| `spillway_webhooks_total` | counter | `outcome` | Completion webhooks `delivered` (the receiver answered 2xx), or `failed`: refused with an answer Spillway doesn't retry, such as `401`, or out of retries. They aren't counted in the job metrics above. |
+| `spillway_active_queues` | gauge | `target` | Queues with work waiting (one per tenant with account queues on) |
+| `spillway_backlog_jobs` | gauge | `target` | Jobs queued or in flight |
+| `spillway_flow_rate_rps` | gauge | `target` | Sum of the active queues' current rates, after the target API's pacing headers |
+| `spillway_fairness_jain` | gauge | `target` | [Jain's index](https://en.wikipedia.org/wiki/Fairness_measure) over queues with work waiting, by jobs each finished in about the last minute. `1` is perfectly even, `1/n` is one queue getting everything. Absent when nothing is waiting. |
+| `spillway_node_info` | gauge | `node_id` | `1`, carrying the id sent as `X-Aqueduct-Node-Id` |
+
+`target` is the target API's scheme and host (`https://api.example.com`), or the pool id. The first 1,000 targets seen get their own label and the rest share `other`, since URL jobs can name any host. There are no tenant labels: tenant IDs are unbounded, and often customer data. (Aquifer's opt-in `AQUIFER_METRICS_TENANT_LABELS` has no Spillway equivalent yet.)
 
 ## Health check
 

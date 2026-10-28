@@ -40,6 +40,9 @@ defmodule Spillway.Application do
         # owns the idempotency key gate.
         Spillway.Store,
         SpillwayWeb.Telemetry,
+        # Owns the ETS table the built-in metrics adapter counts into and
+        # GET /metrics reads. Idle unless it's the configured adapter.
+        Spillway.Metrics.Prometheus,
         {Cluster.Supervisor, [Spillway.Cluster.topologies(), [name: Spillway.ClusterSupervisor]]},
         {Phoenix.PubSub, name: Spillway.PubSub},
         # Pooled, persistent connections for upstream and webhook dispatch
