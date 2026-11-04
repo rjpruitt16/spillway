@@ -1,7 +1,7 @@
 # External registration
 
 **Off by default.** A normal deployment (a single long-lived node, or static domain/tenant
-partitioning as described in [README.md](README.md#deployment-model)) is completely unaffected unless
+partitioning as described in [Partitioning](docs/partitioning.md)) is completely unaffected unless
 you explicitly turn this on — no background process runs, no added overhead, nothing about default
 behavior changes.
 
