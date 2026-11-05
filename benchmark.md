@@ -1,6 +1,6 @@
 # Benchmarks
 
-Real runs against a live deployment (`spillway.fly.dev`), same `shared-cpu-1x`/512MB Fly.io tier and methodology as [Aquifer's benchmark.md](https://github.com/rjpruitt16/aquifer/blob/main/benchmark.md), the Go/SQLite sibling this project mirrors. Scripts are in [`benchmark/`](benchmark/).
+Real runs against a live deployment (`spillway.fly.dev`), same `shared-cpu-1x`/512MB Fly.io tier and methodology as [Aquifer's benchmark.md](https://github.com/rjpruitt16/aquifer/blob/main/docs/reference/benchmark.md), the Go/SQLite sibling this project mirrors. Scripts are in [`benchmark/`](benchmark/).
 
 Benchmarking surfaced two real bugs and one architecture trade-off, all fixed or characterized below.
 
