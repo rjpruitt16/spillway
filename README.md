@@ -1,487 +1,99 @@
-# Spillway — Load balancer for agentic workloads
-
-Formerly **EZThrottle Local**. See [Upgrading from EZThrottle Local](#upgrading-from-ezthrottle-local).
+# Spillway
 
 ![How engineers respond to congestion: pacing and backpressure everywhere else in infrastructure, versus retrying everything immediately at the API layer](docs/images/how-engineers-respond-to-congestion.jpg)
 
-**TL;DR — why not Envoy?**
+A durable queue that paces traffic into a service at the rate it can take, built on Elixir and the BEAM. Put it in front of your webhook handlers, a rate-limited third-party API, a GPU or your own backend: when a burst arrives faster than the target can handle, Spillway holds the excess on disk instead of letting callers retry into it, and releases it at the rate the target asks for.
 
-Envoy circuit breaking protects an overloaded service by rejecting excess work outright. That keeps the backend alive, but a rejected request is just gone. Nothing durable survives it, and the client is left to retry independently, creating uncoordinated competition for whatever capacity opens up next and wasting cycles on repeated attempts.
+A spillway is how a dam lets out water it can't hold, at a rate the river below can take. This one works in both directions: inbound, it holds the burst that agents and clients send your API; outbound, it holds the calls your app makes to rate-limited APIs.
 
-Spillway takes a different approach: persist the excess work, then pace its release.
-
-The backend is also closer to the truth about its own capacity than a static proxy limit ever is. If the fleet loses half its usable capacity, the admission rate should fall; if capacity expands, the release rate should rise. Instead of leaning on static limits like max connections or concurrent requests, Spillway can ask the backend directly, continuously: *how fast should we send work right now?* (See [Per-tenant fairness](#per-tenant-fairness-accountqueue-mode) for how that ceiling, backoff, and recovery actually work.)
-
-Circuit breaking protects the service by saying "stop." Spillway coordinates demand by saying "wait here, and I'll tell you when to go."
-
-The name: a spillway is how a dam releases water it can't hold, at a rate the river below can take, so the dam doesn't fail. This one works in both directions. Inbound, it holds the burst agents and clients send your API. Outbound, it holds the calls your app makes to rate-limited APIs. Either way, the excess waits and is released at a pace the other side can handle.
-
-**Increase your rate limit without DDoSing your backend.**
-
-Kubernetes and modern orchestrators are great at scaling compute, but they weren't designed for spiky traffic or tenant fairness. When a burst of requests arrives, your pods get hammered, queues back up unevenly, and one noisy tenant crowds out everyone else. Horizontal scaling helps eventually, but the spike hits before a new pod is ready, so the burden falls on clients retrying uncoordinated: [wasted utilization and higher cost](https://rahmipruitt.me/content/gpu-retry-tax/) on one end, [outages reactive autoscaling alone can't prevent](https://rahmipruitt.me/content/github-outage-reactive-scaling/) on the other.
-
-The usual fix for that is more hardware: double the fleet, triple the GPU budget, eat the bill. It works, but it's expensive, it leaves capacity idle most of the time, and it doesn't actually fix the burst, just buys enough headroom to survive the next one:
-
-![How teams handle traffic spikes: overprovisioning the fleet versus queueing the burst and pacing the flow while capacity catches up](docs/images/how-teams-handle-traffic-spikes.png)
-
-Spillway is what I built to actually fix it: a self-hosted load balancer that absorbs bursts into a durable queue, dispatches at a controlled rate, and spreads traffic across a pool of backend instances. Your API sheds load by talking back, not by getting hammered until it falls over.
-
-What's usually behind that API can't scale instantly either: a GPU, a database, a CI runner. Spillway buys time for more of it to come online; it's overkill if that ceiling is fixed for good.
-
-Real numbers (durability, throughput ceiling, admission shedding, multi-tenant fairness, a real GPU under load, and a [112-hour soak with 0 lost jobs across 28 restarts](benchmark/soak/results/run-3l/README.md)) are in [benchmark.md](benchmark.md), including a head-to-head against [Aquifer](https://github.com/rjpruitt16/aquifer), the Go/SQLite sibling this project mirrors. Longer, end-to-end tests of the Aqueduct protocol in front of real open-source systems, starting with Hatchet behind Aquifer, are in [aqueduct-benchmarks](https://github.com/rjpruitt16/aqueduct-benchmarks).
+- **Retry storm mitigation.** Callers wait in a durable queue instead of hammering a struggling service with retries, and the queue drains as capacity comes back.
+- **Fairness.** Every tenant can get its own queue, paced on its own. In the fairness test, a quiet tenant's jobs finished in 1–5 s while another tenant flooded the same target; stuck behind the flood in one shared queue, they took 35–52 s.
+- **Delivery however the caller wants it:** results on the same connection (`POST /proxy`), a live event stream, or a durable webhook that's paced and retried like any other job, plus WebSocket sessions proxied with a transcript that replays anything missed after a reconnect.
 
 ![Traditional load balancing collapsing under a spike, round-robin flickering faster as instances die, versus Aqueduct pacing that keeps the fleet stable while an autoscaler brings real capacity online](docs/images/fleet-degradation.gif)
 
----
+## Why not Envoy, Redis, SQS or Hookdeck?
 
-## Use cases
+**Envoy** protects an overloaded service by rejecting the excess. A rejected request is gone, so every client retries on its own and they all compete for whatever capacity frees up next. Circuit breaking says "stop." Spillway says "wait here, and I'll tell you when to go."
 
-**Protect your API**
-```
-agents / clients  →  POST /jobs to Spillway  →  your backend (at controlled RPS)
-```
-Agents or clients hammering your API over HTTP? Spillway queues their requests and drains them to your backend at a pace it can handle. Your backend returns `X-Aqueduct-Rps` headers to signal how fast it wants traffic in real time.
+![Circuit breaking rejecting requests and clients retrying into a thundering herd when it reopens, versus Aqueduct's per-client queues releasing work at the pace the backend asks for](docs/images/circuit-breaking-vs-queue.gif)
 
-**A durable checkpoint in front of a rate-limited resource**
-```
-your app  →  POST /jobs to Spillway  →  database / CI runner / OpenAI / Stripe / any rate-limited API
-```
-Calling something with its own capacity limit (a database read replica, a CI runner, a third-party API)? Spillway queues the calls durably and dispatches them at your configured rate, so a burst from your own side never becomes the thing that takes the downstream down. Works especially well closed-loop: if the downstream already speaks `X-Aqueduct-*` headers, it can tell Spillway to back off in real time instead of you guessing a static rate.
+**Redis or SQS plus a rate-limited worker** can do the core of this. Spillway gives you the rest without writing it: a queue per tenant with fair admission, a pace the target sets live (`X-Aqueduct-*` response headers, or vLLM's and Triton's load reports) instead of a fixed worker rate, `POST /proxy` falling back to the queue on the same connection, idempotency keys, and results by stream or webhook.
 
-**Edge load balancer → gateway — pace and route at the edge**
-```
-your users  →  POST /proxy to Spillway  →  your resources (paced, routed, at the speed you can handle)
-```
-Point Spillway at your resources like a normal reverse proxy, close to the caller. It tries the request directly first (a healthy resource sees no queue at all) and only falls back to durable queuing when something's actually overloaded, on the same connection, staying in queue mode until that domain's backlog is genuinely drained (not just until a cooldown timer expires). See [`POST /proxy`](API.md#post-proxy) for the details, including the header an upstream can use to request queuing proactively. For low-latency cross-region failover on top of that: Fly.io's own [`fly-replay`](https://fly.io/docs/networking/dynamic-request-routing/) is a response header *your* app returns to tell Fly's edge "redeliver this request in a different region." Your own logic in front of Spillway can watch for the same overload signal the circuit breaker already uses (429, 5xx, an ORCA threshold) and respond with `fly-replay` instead of just falling back locally, rerouting at Fly's edge rather than adding a round trip through your own infrastructure. Not something Spillway implements itself; the same overload classification just composes naturally with it.
+**Hookdeck** queues inbound webhooks as a hosted service, billed by usage. Spillway runs on your own machines: there's no per-event fee, but you run and pay for the infrastructure. It also paces outbound API calls, agent tool calls and WebSocket sessions.
 
-In all three, the upstream can lower the dispatch pace via response headers. See [Per-tenant fairness](#per-tenant-fairness-accountqueue-mode) for how the ceiling, backoff, and recovery actually work.
+**Temporal** makes workflows durable and can cap how fast a task queue runs, but that cap is a number you set, not what the downstream reports it can take right now.
 
-**Durable WebSocket proxy**
-```
-clients  →  trusted gateway  →  GET /websocket  →  WebSocket backend
-```
-The same `aqueduct.v1` protocol as Aquifer, backed by the node's local store: durable ordered messages, cursor replay, paced upstream connection openings, and automatic reconnect. Authentication remains the gateway's job. See [`GET /websocket`](API.md#get-websocket).
+They combine: Envoy in front as the gateway, Hookdeck delivering webhooks into Spillway, and Temporal activities calling Spillway's `POST /proxy`.
 
----
+## Spillway or Aquifer?
 
-## How it works
+[Aquifer](https://github.com/rjpruitt16/aquifer) is the Go sibling. Both speak the same Aqueduct protocol and take the same `POST /jobs` body, so a backend that sends `X-Aqueduct-*` headers works with either. Pick Spillway if your team runs Elixir or wants a BEAM cluster where any node can take any user's request: connected nodes give each queue one live owner. Pick Aquifer for a single Go binary, a per-host rate file, and the larger set of end-to-end benchmarks.
 
-```
-Client → POST /jobs → Spillway → paced outbound requests → Your API
-              ↓                                                          ↓
-     GET /jobs/:id/stream                                        response body
-              ↓                                                          ↓
-     live event stream ←─────────────────────────────────────────────────
-              ↓
-     (or webhook if stream drops)
-```
+## Results
 
-1. **Submit a job**: POST the request you want forwarded, with a `webhook_url` for the response.
-2. **Spillway queues it**: jobs are held in memory and dispatched at the configured RPS.
-3. **Your API responds**: Spillway reads pacing headers from the response and adjusts automatically, falling back to the real [ORCA](https://github.com/cncf/xds/blob/main/xds/data/orca/v3/orca_load_report.proto) standard for backends that report load a different way (vLLM and Triton/TensorRT-LLM both work today). See [Per-tenant fairness](#per-tenant-fairness-accountqueue-mode) below for the full header reference.
-4. **Stay on the line or hang up**: open `GET /jobs/:id/stream` to receive live events as the job moves through the queue, or disconnect and the result is delivered to your `webhook_url` when ready.
+- **112 hours under chaos, 0 jobs lost.** One performance-2x Fly machine took 185.3M jobs at 500 jobs/s from 50 users, with a target, webhook receiver and WebSocket backend that kept switching between healthy, slow, erroring and down, a `kill -9` every 3–5 hours and a machine reboot every 36. Across 28 restarts no accepted job was lost; 9,956 webhooks were delivered twice, all within 10 minutes of a restart. Not everything held: 7,801 of 83.7M WebSocket commands (0.009%) didn't complete within 5 minutes, 262 jobs finished without their webhook, and jobs whose runner died waited for the next restart to be recovered (fixed since in #72 and #78). [Write-up](benchmark/soak/results/run-3l/README.md).
+- **vLLM's queue: 447 waiting requests direct, 0 through Spillway,** at the same 40 requests a second. Spillway sent vLLM one request at a time here, because its concurrency starts at 1 and vLLM doesn't send a header to raise it ([#7](https://github.com/rjpruitt16/spillway/issues/7)), so this run didn't exercise its load-report pacing end to end.
+- **Capacity per machine** (measured 2026-10-07, on the Mnesia store that RocksDB has since replaced), accepting, dispatching and delivering a webhook for every job: about 700 jobs/s on a Fly performance-1x, 1,300–1,500 on a 2x, and 3,000 on a 4x, where it sheds with `429` past the ceiling and drains back to zero.
 
----
+Methods and caveats: [benchmark.md](benchmark.md), and the end-to-end tests of the Aqueduct protocol in [aqueduct-benchmarks](https://github.com/rjpruitt16/aqueduct-benchmarks).
 
-## Per-tenant fairness (AccountQueue mode)
+## Quick start
 
-By default all traffic for a destination flows through one shared queue. Turn on per-tenant isolation via a response header (or set it on submission if you already know a tenant needs it) and each `user_id` + API key gets its own independently paced queue: a heavy user no longer blocks everyone else, and each tenant can run at a genuinely different pace.
-
-![Traditional circuit breaking rejecting requests outright, forcing clients to retry independently into a thundering herd on reopen, versus Aqueduct's per-client queues pacing release via X-Aqueduct-Rps until the backend catches up](docs/images/circuit-breaking-vs-queue.gif)
-
-<details>
-<summary>Full pacing reference — headers, isolation mechanics, ORCA fallback, webhook pacing</summary>
-
-**By your API's response**: respond to a dispatched request with:
-
-```
-X-Aqueduct-Account-Queue: enabled
-```
-
-(or `X-EZTHROTTLE-ACCOUNT-QUEUE: enabled`; both are read, `X-Aqueduct-*` first if both are present)
-
-**By the client submitting the job**: set the same header on the `POST /jobs` request itself, if you already know at submission time that this tenant needs isolation:
-
-```
-X-Aqueduct-Account-Queue: enabled
-```
-
-Either way, Spillway switches to per-user isolation: each `user_id` + API key gets its own queue. A heavy user no longer blocks everyone else.
-
-Above 70% of the shared upstream backlog budget, queues holding more than their current fair share receive progressively more `429` responses while smaller queues continue entering, even once the budget is full (up to 125% of it). One active queue can still use the entire budget. See [API.md](API.md#fair-queue-admission) for the formula and observability headers.
-
-Critically, each user can run at a **different pace**. If your service processes requests from user A faster than user B, because of their tier, their data size, or just load at that moment, each user's queue drains independently at the rate their own responses signal back. A premium user responding with `X-Aqueduct-Rps: 50` runs at 50 RPS while a free-tier user on `X-Aqueduct-Rps: 2` runs at 2, in parallel, without either affecting the other. Note that literal pace (RPS/max-concurrent) can only ever be set by the upstream's own response headers, never by the client submitting the job, so a client can ask for isolation but never for a faster rate than what's configured.
-
-Disable it any time by responding with `X-Aqueduct-Account-Queue: disabled`.
-
-Each tenant's own pace is still capped by the upstream's actual budget, though: a background check keeps the *sum* of every active tenant queue's rate within the upstream's configured (or, for a pool-backed upstream, live aggregate) ceiling, throttling proportionally if too many tenants are active at once. Isolation between tenants doesn't mean each one gets its own unbounded copy of the full rate.
-
-`X-Aqueduct-*` is read first if both namespaces are present: the shared protocol namespace also spoken by [Aquifer](https://github.com/rjpruitt16/aquifer), so a backend already emitting Aqueduct headers works against either implementation unchanged.
-
-**ORCA fallback**, for backends that speak neither namespace but already report load some other way: Spillway sends `endpoint-load-metrics-format: text` on every dispatch, and a response carrying an `endpoint-load-metrics` header is used to pace down (full rate below 70% utilization, 2 RPS at 70-90%, 0.5 RPS at 90-97%, 0.25 RPS above that) only when no explicit Aqueduct/Spillway header is present. Two backends verified directly against their own source: **vLLM** (metric name `kv_cache_usage_perc`, case-insensitive opt-in) and **Triton/TensorRT-LLM** (metric name `kv_cache_utilization`, case-sensitive lowercase-only opt-in; Spillway sends lowercase specifically so both work).
-
-Long-term protocol goal: if more services emit `X-Aqueduct-*`, agents can respond to capacity signals instead of independently guessing retry and concurrency behavior. Spillway works today without ecosystem adoption; broader protocol adoption is the longer-term goal.
-
-**Webhook delivery uses this same pacing, not a separate fire-and-forget path.** A webhook POST is enqueued as its own job, keyed by the receiver's domain, and dispatched through the identical AccountQueue machinery described above, so a webhook receiver can slow Spillway down with `X-Aqueduct-Rps`/`X-Aqueduct-Max-Concurrent` response headers exactly the way a real upstream can, instead of just getting hammered on a fixed retry schedule. It's also crash-durable: a webhook still pending when the node restarts is recovered and retried the same way a queued job is. Retries trigger on connection errors, `5xx`, `408` and `429`, with exponential backoff capped at `SPILLWAY_RETRY_MAX_BACKOFF_SECONDS` (300). The default is 10 retries, about 13 minutes: enough to ride out a receiver deploy or restart, and a receiver that stays down longer fails its webhooks rather than piling them up (the result stays readable at `GET /jobs/:id`). Set `"webhook_max_retries"` on the job (or the `X-Aqueduct-Webhook-Max-Retries` header, which wins) to change that for this job's webhook only, separately from `max_retries` for the upstream call: `0` sends it once, `4` gives up after about 15 seconds, and `-1` keeps retrying until the receiver accepts it, for up to 24 hours. Every retryable failure halves the queue's pace; an `X-Aqueduct-Rps` on a failed response can only lower it further, never raise it, so a receiver that stamps the same rate on every response, `503`s included, still gets backed off while it's down. Drain mode's own ledger-flush webhook is unaffected: it stays synchronous, confirming delivery before clearing the local idempotency ledger.
-
-</details>
-
----
-
-## Agent-native load balancing
-
-Instead of dispatching to a fixed `url`, a job can target a named **pool**: a group of registered service instances Spillway picks from at dispatch time, weighted by declared capacity and live reputation. Ported from [Aquifer](https://github.com/rjpruitt16/aquifer)'s Go implementation, built and proven out there first.
-
-<details>
-<summary>Full pool reference — registration, dispatch, reputation model</summary>
-
-**Registering a member:**
-
-```bash
-curl -X POST https://your-spillway/pools/writers/members \
-  -d '{"member_id": "writer-1", "address": "http://10.0.1.5:8080", "capacity_rps": 20, "heartbeat_interval_seconds": 30}'
-```
-
-The same call is both initial registration and heartbeat: call it again periodically (at roughly your declared `heartbeat_interval_seconds`) to stay in the pool. Missing several consecutive expected heartbeats evicts a member. A member can register under more than one pool id.
-
-**Dispatching to a pool:**
-
-```json
-{
-  "user_id": "user-123",
-  "idempotent_key": "job-1",
-  "pool_id": "writers",
-  "method": "POST",
-  "webhook_url": "https://yourapp.com/webhooks/spillway"
-}
-```
-
-`pool_id` and `url` are mutually exclusive: a job sets exactly one.
-
-**How a member gets picked:** proportional to `capacity_rps × reputation`, not equal-split round robin: a member declaring 100 RPS gets roughly 4x the dispatches of one declaring 25. The pool's aggregate ceiling is the live sum of every member's current effective rate, so it grows and shrinks automatically as members register, degrade, or drop out, with no need to reconfigure Spillway as your fleet autoscales.
-
-**Reputation**: a dispatch failure halves a member's effective share; a success nudges it back up. A member isn't evicted on one bad response, only once its reputation has stayed at the floor continuously, with no interrupting success, for a sustained window. This avoids flapping a member in and out of the pool over a single transient error.
-
-**Set `capacity_rps` conservatively, not at your true theoretical max.** Spillway only learns a member died via a failed dispatch or a missed heartbeat, both of which lag the actual failure, so leaving headroom in what you declare gives real slack for that detection delay. Reputation decay is a second line of defense on top of this.
-
-**A given `pool_id` should belong to exactly one Spillway instance**: pool membership is not distributed by Syn. If the same member registers the same `pool_id` with two different instances, each one independently believes it owns that member's full declared capacity. If a member genuinely needs to register with more than one instance, divide its declared `capacity_rps` across however many it's registered with.
-
-`GET /health` reports every pool's current members, their declared capacity, and current reputation.
-
-</details>
-
----
-
-## Streaming — stay on the line or get a voicemail
-
-Most queue systems force you to choose: poll for status or hope the webhook lands. Spillway gives you a third option: an open SSE stream that tells you exactly what's happening in real time, or a `webhook_url` fallback if you disconnect. Coordination built into the infrastructure, the same way TCP handled it at Layer 4. At Layer 7, for API workflows, the queue is the protocol.
-
-<details>
-<summary>Full streaming reference — event shapes, queue position for agent fleets</summary>
-
-```bash
-# Submit a job
-curl -X POST http://localhost:4000/jobs -d '{...}'
-# → { "job_id": "abc123" }
-
-# Stay on the line
-curl -N http://localhost:4000/jobs/abc123/stream
-```
-
-```
-event: queued
-data: {"job_id":"abc123","status":"queued"}
-
-event: position
-data: {"job_id":"abc123","position":4}
-
-event: position
-data: {"job_id":"abc123","position":2}
-
-event: dispatching
-data: {"job_id":"abc123"}
-
-event: completed
-data: {"job_id":"abc123","response_status":200,"body":"..."}
-```
-
-**If the stream drops before completion, the result is delivered to your `webhook_url` automatically.** Terminal results are also retained for `GET /jobs/:id`, so polling later returns the same completed/failed payload.
-
-### Queue position for agent fleets
-
-When multiple agents share the same API key, they share the same queue. The `position` event tells each agent where it stands:
-
-```
-position: 12 → the line is long, go work on something else
-position: 3  → getting close, stay on the line
-dispatching  → your turn
-```
-
-An agent that sees position 12 can disconnect, pick up other work, and trust the webhook will arrive when the job is done. An agent at position 1 stays on the line and streams the response as tokens arrive.
-
-</details>
-
----
-
-## API
-
-```bash
-POST /jobs
-Content-Type: application/json
-
-{
-  "user_id": "user_123",
-  "idempotent_key": "order-456-attempt-1",
-  "url": "https://api.yourservice.com/process",
-  "method": "POST",
-  "headers": { "Authorization": "Bearer sk-..." },
-  "body": "{\"input\": \"data\"}",
-  "webhook_url": "https://yourapp.com/webhooks/results"
-}
-```
-
-**[API.md](API.md)** has the full reference: streaming events, checking job status, `POST /proxy` (edge-gateway mode, see [Use cases](#use-cases)), the health check, and the response headers your API can return to control pacing.
-
----
-
-## Idempotency
-
-Every job requires an `idempotent_key`. Submitting the same key twice **for the same `user_id`** returns the original job ID without re-executing the request; different users can safely use the same `idempotent_key` without colliding with each other. Keys expire after 24 hours (configurable).
-
-**Shared scope.** With `SPILLWAY_SHARED_IDEMPOTENCY_ENABLED=true`, a job can set `"idempotency_scope": "shared"` to dedup on `idempotent_key` alone, across every `user_id`. Many agents asking for the same resource then coalesce onto one upstream call: later callers get `200 + "duplicate": true` with the first job's ID and can poll or stream it; they don't get their own webhook. Anyone who knows a shared key can read its result, so use keys that name a public resource (`weather:sf:2026-10-05`), never a user's private data. Backed by Mnesia (`disc_copies`), not ETS: durable across a crash, not just a graceful restart. See [benchmark.md](benchmark.md) for what that guarantee actually costs and how it's tuned.
-
-**Delivery semantics:** Spillway provides at-least-once dispatch and webhook delivery, not exactly-once execution. If the node crashes after a dispatch succeeds but before it records that completion, the recovered job dispatches to the upstream again on restart, so it's not just the webhook that can repeat, the upstream call itself can. Make both your upstream endpoint and your webhook handler idempotent on `job_id` (or `idempotent_key`) anywhere duplicate execution isn't safe, the same contract Stripe and GitHub webhooks already ask of you.
-
----
-
-## Durability (RocksDB)
-
-Jobs, idempotency keys and results are written to RocksDB on the node's disk, called directly from Elixir. Spillway used Mnesia until soak run 3; its transaction layer and the Mnesia-to-RocksDB adapter were where the cost and most of the bugs were.
-
-<details>
-<summary>Full durability reference — store directory, log sync</summary>
-
-Two things matter for what "durable" actually means here:
-
-- `SPILLWAY_STORE_DIR`: where the database lives. **Must point at a persistent volume in production** (`/data/spillway` by default, mirroring Aquifer's `DB_PATH`). Without a real volume mount, this data lives on the machine's ephemeral filesystem and durability is lost on every redeploy.
-- `SPILLWAY_STORE_SYNC_INTERVAL_MS` (default `100`): every write reaches RocksDB's write-ahead log before it returns, so a killed process loses nothing. The log is synced to disk on this timer, which bounds what a machine or kernel crash can lose to about this many milliseconds of writes. `0` syncs on every write (no loss on a machine crash, a disk flush per request).
-- `SPILLWAY_STORE_CACHE_MB` (default `128`): RocksDB's read cache, shared by every table. It sits outside the BEAM but counts toward resident memory, so leave room for it under `SPILLWAY_MEMORY_LIMIT_MB`. Each table also keeps a bloom filter, so looking up a key that isn't stored (a new idempotency key) rarely reads the disk.
-
-A job's rows are written as one atomic batch. Each node's store is its own; nodes don't replicate it.
-
-</details>
-
----
-
-## Partitioning strategies
-
-Running one node for everything works fine until you have multiple tenants or multiple upstreams sharing it, and then one tenant's burst, or one upstream's own rate limit, ends up affecting everyone else on that same node. Two ways to split traffic apart so that doesn't happen, not mutually exclusive:
-
-**Static partitioning**: decided once, at deploy time. Dedicate one standalone node, or one connected cluster, to a protected resource (a CI runner, a database, a GPU, or a rate-limited external API) so that resource only sees traffic paced through one coordinated queue owner. Multiple tenants can safely share it: turn on [AccountQueue mode](#per-tenant-fairness-accountqueue-mode) and each tenant gets an independently paced queue. Unconnected nodes still multiply the configured rate, and pools remain local to one instance because pool membership is not distributed by Syn.
-
-**Dynamic partitioning (drain mode)**: off by default, for a more specific shape. Instead of deciding every assignment up front, a node gets handed to one tenant at a time, absorbs and drains whatever burst that tenant sends, then frees itself up to be handed to a *different* tenant next, useful when you want dedicated capacity per user without hand-assigning it at deploy time. A normal single-node or statically-partitioned deployment is completely unaffected unless you turn this on. When idle for `SPILLWAY_DRAIN_TIMER_SECONDS`, the node flushes its deduped idempotency ledger to a webhook and clears local state, moving through an `active` → `draining` → `unassigned` state machine visible via `GET /health`; optional batch streaming can send acknowledged terminal-job chunks before that final idle handoff. See **[DRAIN_MODE.md](DRAIN_MODE.md)** for the full state machine, env vars, and webhook payload shape.
-
-The two combine: a fleet can partition statically by upstream domain, while individual nodes within a partition cycle through tenants dynamically via drain mode. This mirrors [Aquifer's](https://github.com/rjpruitt16/aquifer) identical guidance.
-
-**External registration**: off by default, and orthogonal to the above. `SPILLWAY_REGISTRY_URL` makes a node periodically report its own listening port to an external control plane (deciding tenant assignment, scaling, etc. is entirely that service's job, not this node's). See **[REGISTRATION.md](REGISTRATION.md)** for the env vars and ping payload shape.
-
-**Region-local clustering is optional.** With `DNS_CLUSTER_QUERY` set, libcluster discovers sibling BEAM nodes and Syn gives each upstream/account queue one live owner across the connected cluster, so any node can accept a user's request without creating a second queue. Unset, Spillway remains standalone. Each node's store stays local to it; see [API.md](API.md#region-local-queue-ownership) for the exact boundary and settings.
-
----
-
-## Admission control
-
-Memory/DB-size ceilings that shed new (non-duplicate) jobs with a `429` once exceeded, mirroring [Aquifer's](https://github.com/rjpruitt16/aquifer) admission control.
-
-<details>
-<summary>Full admission control reference — env vars, defaults</summary>
-
-| Env var | Default | Description |
-|---|---|---|
-| `SPILLWAY_VALKEY_URL` | *(unset)* | Keep WebSocket transcripts in Valkey/Redis streams (`XADD` with `MAXLEN`, expiring after `SPILLWAY_WS_STREAM_TTL_SECONDS`), as Aquifer does. Unset, they stay in the node's local store. |
-| `SPILLWAY_STORE_MAX_BACKLOG` | `5000` | Refuse new jobs with 429 (`store_backlog`) once this many store writes are queued, instead of letting them pile up. `0` disables. Queue depths are on `GET /health` under `admission`. |
-| `SPILLWAY_MEMORY_LIMIT_MB` | 70% of the container's memory limit, or of the machine's memory | Reject new jobs once the process's resident memory exceeds this many MB. Retained jobs live on disk, so memory doesn't grow with how many are kept. The default is logged at startup and is only a guess: if anything else runs on the machine (Valkey, a sidecar) or the machine is resized, set it yourself. `0` disables it. Off by default where memory can't be read (macOS). |
-| `SPILLWAY_MAX_SYNC_LAG_MS` | `1000` | Reject new jobs with 429 (`sync_lag`) while the store's log hasn't been synced to disk for this long. Writes reach the OS as they're made, but disk only on the `SPILLWAY_STORE_SYNC_INTERVAL_MS` timer, so a machine crash or host reboot loses what came after the last sync. On a saturated node the timer can fall seconds behind. `0` disables it. `GET /health` shows `admission.sync_lag_ms`. |
-| `SPILLWAY_ALLOWED_URL_DOMAINS` | *(unset, unrestricted)* | Comma-separated hostnames that `url`-routed jobs, `POST /proxy` and WebSocket upstreams may target (subdomains included); see [API.md](API.md#submit-a-job) |
-| `SPILLWAY_NODE_ID` | `FLY_MACHINE_ID`, else the host name | This node's id, sent to backends as `X-Aqueduct-Node-Id` and shown on `GET /metrics` ([API.md](API.md#get-metrics)) |
-| `SPILLWAY_MAX_BODY_BYTES` | `1048576` (1MB) | Reject oversized request bodies with `413` |
-| `SPILLWAY_DB_MAX_BYTES` | `838860800` (800MB) | Reject new jobs once the store directory exceeds this many bytes |
-| `SPILLWAY_MAX_EXPIRY_LAG_SECONDS` | `300` | Refuse new jobs with 429 (`expiry_lag`) while cleanup of expired jobs is more than this many seconds behind, so intake can't grow the store faster than it's cleaned. `0` disables. The lag and cleanup timings are on `GET /health` under `admission.expiry`. |
-| `SPILLWAY_MAX_PENDING_PER_USER` | `10000` | Reject new client work for one user once its queued plus in-flight jobs reach this ceiling; `0` disables it |
-| `SPILLWAY_MAX_PENDING_PER_UPSTREAM` | `10000` | Shared per-upstream backlog budget used by fair admission; `0` disables it |
-| `SPILLWAY_RETRY_AFTER_SECONDS` | `5` | Base `Retry-After` on a `429`: doubles per consecutive rejection (capped at 60s), resets the moment a request is allowed again |
-
-Body-size and DB-size admission are **on by default**, sized off the infrastructure this project is
-actually benchmarked against (a single 512MB Fly.io instance with a 1GB volume; see
-[benchmark.md](benchmark.md)); set an explicit `0` to disable a check, or raise it for a bigger
-deployment. Memory is the exception: there's no safe one-size-fits-all default since it depends on
-your own deployment's memory budget, so it stays disabled until set explicitly; Spillway logs a
-warning on startup if it isn't (benchmarked safe at 400MB on a 512MB instance, as a starting point).
-`GET /health` reports a live `admission` snapshot.
-
-</details>
-
----
-
-## Configuration
-
-Runtime config lives in `config/runtime.exs`: default RPS, account-queue mode, idempotency TTL, and a pluggable metrics adapter.
-
-<details>
-<summary>Full configuration reference — runtime config, metrics adapter behaviour</summary>
-
-```elixir
-# config/runtime.exs
-config :spillway,
-  default_rps: 2.0,
-  account_queue_enabled: false,   # opt-in per-tenant isolation
-  idempotent_ttl: 86_400,         # seconds
-  metrics_adapter: MyApp.Metrics  # optional; defaults to no-op
-```
-
-### Metrics adapter
-
-Spillway emits lifecycle events through a configurable metrics adapter.
-Adapters implement the `Spillway.Metrics` behaviour:
-
-```elixir
-defmodule MyApp.Metrics do
-  @behaviour Spillway.Metrics
-
-  def job_queued(user_id, upstream), do: :ok
-  def job_dispatched(user_id, upstream), do: :ok
-  def job_completed(user_id, upstream, duration_ms), do: :ok
-  def job_failed(user_id, upstream, reason), do: :ok
-  def webhook_delivered(url, attempt), do: :ok
-  def webhook_failed(url, attempts), do: :ok
-  def queue_depth(upstream, depth), do: :ok
-  def flow_rate(upstream, rps), do: :ok
-end
-```
-
-The default adapter is `Spillway.Metrics.Noop`, so existing deployments do not change.
-
-### Region adapter (cross-region /proxy redirect)
-
-Off by default. Set `SPILLWAY_FLY_REGIONS` (comma-separated Fly region codes this app is deployed to) to enable `/proxy`'s cross-region redirect on Fly. See [API.md's "Cross-region redirect" section](API.md#cross-region-redirect-flyio) for the full behavior. Direct port of Aquifer's `RegionAdapter`/`FlyRegionAdapter`.
-
-| Env var | Default | Description |
-|---|---|---|
-| `SPILLWAY_FLY_REGIONS` | _(none, feature off)_ | Comma-separated Fly region codes this app is deployed to |
-| `SPILLWAY_FLY_POLL_INTERVAL_SECONDS` | `30` | How often to poll sibling regions over Fly's private network for liveness |
-| `SPILLWAY_REDIRECT_GATE_COOLDOWN_SECONDS` | `500` | How long to stop attempting cross-region redirect after a tour finds no reachable region at all: internal probe throttling, not what's told to the caller |
-| `SPILLWAY_REDIRECT_EXHAUSTED_RETRY_AFTER_SECONDS` | `900` (15min) | `Retry-After` sent to the caller when cross-region redirect is configured but exhausted: request is rejected (429), not queued locally |
-
-Custom implementations plug in via `:region_adapter`, implementing the `Spillway.RegionAdapter` behaviour (`live_regions/0`, `self_region/0`), same pattern as the metrics adapter above.
-
-</details>
-
----
-
-## L8 Protocol — trustless webhook delivery
-
-Traditional webhook security shares an HMAC secret between sender and receiver, stored in a database on both sides: something that can be stolen, logged accidentally, or forgotten during rotation, letting anyone forge deliveries forever once it leaks. Spillway implements **L8 v0.2**, a lightweight challenge-response protocol that replaces the shared secret with Ed25519 public key cryptography: the receiver publishes a public key, a one-time handshake proves both sides own their private keys, and every delivery afterward carries a signature verified locally in microseconds, with no database lookup and no round-trip to any authority.
-
-The full protocol rationale, wire format, and a reference receiver implementation live at the **[L8 spec](https://rjpruitt16.github.io/l8-protocol/)** (the same canonical spec [Aquifer](https://github.com/rjpruitt16/aquifer) follows), also served locally at `GET /l8-spec` for an agent/script with only network access to this instance. Set `L8_PRIVATE_KEY` for a stable identity across restarts, or let Spillway auto-generate one on first start.
-
-Two additions in 0.2. A receiver that publishes an X25519 `encryption_public_key` gets its webhook bodies encrypted to that key, then signed, so a proxy or log in the middle sees only ciphertext. An upstream that publishes `request_schemas` (JSON Schema per route) gets job bodies checked before dispatch: a mismatch is rejected with `422` instead of burning an upstream call. Schema checks are off unless `SPILLWAY_L8_SCHEMA_VALIDATION=true`; external `$ref`s are never fetched, and a new `X-Aqueduct-Schema-Hash` on an upstream response drops the cached schemas and the L8 trust so the handshake re-runs.
-
----
-
-## Running locally
-
-```bash
-mix setup
-mix phx.server
-```
-
-Integration tests (requires `hurl` and Python 3 with Flask):
-
-```bash
-make integration-test
-```
-
-L8 protocol tests (verifies handshake, signed delivery, and cryptographic signature; requires `pip install cryptography`):
-
-```bash
-make l8-test
-```
-
----
-
-## Docker
+With Docker:
 
 ```bash
 docker build -t spillway .
-docker run -p 4000:4000 spillway
+docker run -p 4000:4000 \
+  -e SECRET_KEY_BASE="$(openssl rand -hex 64)" \
+  -e SPILLWAY_DEFAULT_RPS=5 \
+  -v spillway-data:/data \
+  spillway
 ```
 
----
+Or from source, with Elixir installed: `mix setup && mix phx.server`.
 
-## Do not expose this directly to untrusted callers
+`SPILLWAY_DEFAULT_RPS` sets how many requests a second each target gets (2 if unset), one at a time. The target can change its pace live with `X-Aqueduct-Rps` and `X-Aqueduct-Max-Concurrent` response headers.
 
-`POST /jobs` takes a `url` field and dispatches a real HTTP request to it. If an arbitrary or untrusted party can set that field, Spillway becomes an open relay/SSRF vector: it can be pointed at your internal network, cloud metadata endpoints (`169.254.169.254`), or anything else the machine it runs on can reach, using its own network position and identity. The intended caller is **your own trusted backend or gateway code**, dispatching to a specific microservice or third-party API it already knows about, not an agent, end user, or any other untrusted party choosing the destination itself. Run it on a private network or internal service mesh, not bound to a public address, and if agents need to reach it, put your own authorization and destination allow-listing in front rather than letting them call this API directly.
-
----
-
-## Deployment
-
-Run standalone, partition nodes by upstream, or connect a region-local cluster with `DNS_CLUSTER_QUERY`. Each node persists to its own RocksDB store; Syn coordinates live queue ownership but does not replicate that disk state.
-
-<details>
-<summary>Full deployment reference — Fly.io, Kubernetes, partitioning, zero-downtime updates</summary>
-
-### Deploy to Fly.io
+Send it a job, then read the result:
 
 ```bash
-fly launch --config fly.toml
-fly volumes create ezthrottle_data --region iad --size 1
-fly deploy
+curl -s localhost:4000/jobs -H 'Content-Type: application/json' -d '{
+  "user_id": "me", "idempotent_key": "first-job",
+  "url": "https://httpbin.org/post", "method": "POST", "body": "{\"hello\":\"spillway\"}"
+}'
+# {"job_id":"…","status":"queued"}
+
+curl -s localhost:4000/jobs/<job_id>
+# {"job_id":"…","status":"completed",…,"result":{"response_status":200,"body":"…"}}
 ```
 
-The volume is required: jobs are stored on disk. Without it, `SPILLWAY_STORE_DIR` lives on the machine's ephemeral filesystem and durability is lost on every redeploy.
+Fly.io and Kubernetes setups are in [Running and deploying](docs/deployment.md).
 
-For maximum queue capacity, use the largest available machine. A 32GB RAM machine can hold 3–32 million jobs in memory, enough buffer for hours of traffic at typical agentic workloads, giving your autoscaler time to catch up before a single request is dropped.
+Keep Spillway on a private network behind a gateway you trust: it sends real HTTP requests to the URLs it's given, so it must never take them from untrusted callers. `SPILLWAY_ALLOWED_URL_DOMAINS` limits which hosts it will call.
 
-```toml
-[[vm]]
-  memory = "32gb"
-  cpu_kind = "performance"
-  cpus = 16
-```
+## Durability and running more than one node
 
-### Deploy to Kubernetes
+Each accepted job is written to RocksDB on the local disk of the node that accepted it.
 
-A fourth deployment shape alongside sidecar, standalone, and embedded library: Spillway as a normal Deployment, reached through a Gateway API proxy (Envoy Gateway) instead of a sidecar. See [`examples/kubernetes/`](examples/kubernetes/), verified end-to-end against a real `kind` cluster, including a real pod restart (verified while the store was still Mnesia, which also needed a stable `RELEASE_NODE`).
+- **A killed process loses nothing.** Every write reaches RocksDB's write-ahead log before Spillway answers. The log is synced to disk every 100 ms, so a machine or kernel crash can lose about the last 100 ms of accepted jobs. New jobs get `429` once the sync falls more than 1 second behind.
+- **Recovering a lost job is a resubmit.** Send it again with the same `user_id` and `idempotent_key`: `200` with `"duplicate": true` means Spillway still has it, and `201` means it was lost and has been queued again. Spillway isn't meant to be the record of whether work succeeded; a payment service, for one, should keep its own database.
+- **A restarted node picks its queue back up** from its volume and dispatches it again. Delivery is at least once, so make the target and your webhook handler idempotent on the job's key.
+- **Queued jobs are not replicated.** If a node's disk is lost, the jobs queued on it are lost with it.
+- **More than one node:** unconnected nodes are independent, each with its own queue and pacing, so several of them in front of one target multiply the rate it sees. Either give each protected target its own node, or connect the nodes in one region (`DNS_CLUSTER_QUERY`) so each queue has one owner across them ([Partitioning](docs/partitioning.md)).
 
-### Scaling by partitioning
+## Documentation
 
-See [Partitioning strategies](#partitioning-strategies) above for how to assign tenants to nodes, statically or dynamically.
+The [docs](docs/README.md) folder covers use cases, pacing, pools, streaming, durability, partitioning, configuration, L8 and deployment. The full API is in [API.md](API.md); [DRAIN_MODE.md](DRAIN_MODE.md) and [REGISTRATION.md](REGISTRATION.md) cover handing nodes between tenants and reporting to a control plane.
 
-### Zero-downtime updates
+For coding agents, the [Aquifer engineer skill](https://github.com/rjpruitt16/aquifer/blob/main/skills/aquifer-engineer/SKILL.md) covers benchmarking and tuning an Aqueduct deployment, and its guidance on pacing headers applies here too.
 
-Spillway is built on the BEAM (Erlang VM), which supports hot code reloading. Updates to rate limiting logic, routing behavior, or configuration can be deployed to a running node without restarting the process, and the in-memory queue is preserved across deploys, with no jobs lost.
-
-</details>
-
----
+Formerly EZThrottle Local; see [Upgrading from EZThrottle Local](docs/deployment.md#upgrading-from-ezthrottle-local).
 
 ## Writing
 
-- [Eliminate GPU Waste by Cutting the Retry Tax](https://rahmipruitt.me/content/gpu-retry-tax/): the thesis behind [drain mode](#partitioning-strategies) and the ORCA fallback pacing [GPU benchmark](benchmark.md#6-gpu-inference-and-the-retry-tax-runpodvllm) above.
-- [GitHub Outages Show the Limits of Reactive Scaling](https://rahmipruitt.me/content/github-outage-reactive-scaling/): why reactive scaling and retry storms don't mix, the problem Spillway absorbs instead.
-
-## Upgrading from EZThrottle Local
-
-The project was renamed; behavior is unchanged.
-
-- **Environment variables** are now `SPILLWAY_*`. The old `EZTHROTTLE_*` names still work: at boot each is copied to its new name unless that is already set, and a line on stderr lists the ones still in use.
-- **Release and modules:** the release is `bin/spillway` and the OTP app is `:spillway`.
-- **Wire headers are unchanged.** `X-EZTHROTTLE-*` request and response headers are shared with the managed EZThrottle service and its SDKs, and `X-Aqueduct-*` is the protocol both implementations speak.
-
-## Upgrading from the Mnesia store
-
-Versions before the RocksDB store kept jobs in Mnesia under `MNESIA_DIR`. That data is not migrated: let the node finish its queued jobs (stop sending traffic until `GET /health` shows none pending), then upgrade. `MNESIA_DIR`, `SPILLWAY_STORAGE` and `SPILLWAY_MNESIA_FLUSH_INTERVAL_MS` are no longer read; set `SPILLWAY_STORE_DIR` and `SPILLWAY_STORE_SYNC_INTERVAL_MS` instead. The store isn't tied to the Erlang node name, so a pinned `RELEASE_NODE` is no longer needed to keep it.
+- [Eliminate GPU Waste by Cutting the Retry Tax](https://rahmipruitt.me/content/gpu-retry-tax/)
+- [GitHub Outages Show the Limits of Reactive Scaling](https://rahmipruitt.me/content/github-outage-reactive-scaling/)
 
 ## License
 

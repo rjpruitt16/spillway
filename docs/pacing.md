@@ -1,0 +1,37 @@
+# Pacing and per-tenant fairness
+
+By default all traffic for a destination flows through one shared queue. Turn on per-tenant isolation via a response header (or set it on submission if you already know a tenant needs it) and each `user_id` + API key gets its own independently paced queue: a heavy user no longer blocks everyone else, and each tenant can run at a genuinely different pace.
+
+![Traditional circuit breaking rejecting requests outright, forcing clients to retry independently into a thundering herd on reopen, versus Aqueduct's per-client queues pacing release via X-Aqueduct-Rps until the backend catches up](images/circuit-breaking-vs-queue.gif)
+
+**By your API's response**: respond to a dispatched request with:
+
+```
+X-Aqueduct-Account-Queue: enabled
+```
+
+(or `X-EZTHROTTLE-ACCOUNT-QUEUE: enabled`; both are read, `X-Aqueduct-*` first if both are present)
+
+**By the client submitting the job**: set the same header on the `POST /jobs` request itself, if you already know at submission time that this tenant needs isolation:
+
+```
+X-Aqueduct-Account-Queue: enabled
+```
+
+Either way, Spillway switches to per-user isolation: each `user_id` + API key gets its own queue. A heavy user no longer blocks everyone else.
+
+Above 70% of the shared upstream backlog budget, queues holding more than their current fair share receive progressively more `429` responses while smaller queues continue entering, even once the budget is full (up to 125% of it). One active queue can still use the entire budget. See [API.md](../API.md#fair-queue-admission) for the formula and observability headers.
+
+Critically, each user can run at a **different pace**. If your service processes requests from user A faster than user B, because of their tier, their data size, or just load at that moment, each user's queue drains independently at the rate their own responses signal back. A premium user responding with `X-Aqueduct-Rps: 50` runs at 50 RPS while a free-tier user on `X-Aqueduct-Rps: 2` runs at 2, in parallel, without either affecting the other. Note that literal pace (RPS/max-concurrent) can only ever be set by the upstream's own response headers, never by the client submitting the job, so a client can ask for isolation but never for a faster rate than what's configured.
+
+Disable it any time by responding with `X-Aqueduct-Account-Queue: disabled`.
+
+Each tenant's own pace is still capped by the upstream's actual budget, though: a background check keeps the *sum* of every active tenant queue's rate within the upstream's configured (or, for a pool-backed upstream, live aggregate) ceiling, throttling proportionally if too many tenants are active at once. Isolation between tenants doesn't mean each one gets its own unbounded copy of the full rate.
+
+`X-Aqueduct-*` is read first if both namespaces are present: the shared protocol namespace also spoken by [Aquifer](https://github.com/rjpruitt16/aquifer), so a backend already emitting Aqueduct headers works against either implementation unchanged.
+
+**ORCA fallback**, for backends that speak neither namespace but already report load some other way: Spillway sends `endpoint-load-metrics-format: text` on every dispatch, and a response carrying an `endpoint-load-metrics` header is used to pace down (full rate below 70% utilization, 2 RPS at 70-90%, 0.5 RPS at 90-97%, 0.25 RPS above that) only when no explicit Aqueduct/Spillway header is present. Two backends verified directly against their own source: **vLLM** (metric name `kv_cache_usage_perc`, case-insensitive opt-in) and **Triton/TensorRT-LLM** (metric name `kv_cache_utilization`, case-sensitive lowercase-only opt-in; Spillway sends lowercase specifically so both work).
+
+Long-term protocol goal: if more services emit `X-Aqueduct-*`, agents can respond to capacity signals instead of independently guessing retry and concurrency behavior. Spillway works today without ecosystem adoption; broader protocol adoption is the longer-term goal.
+
+**Webhook delivery uses this same pacing, not a separate fire-and-forget path.** A webhook POST is enqueued as its own job, keyed by the receiver's domain, and dispatched through the identical AccountQueue machinery described above, so a webhook receiver can slow Spillway down with `X-Aqueduct-Rps`/`X-Aqueduct-Max-Concurrent` response headers exactly the way a real upstream can, instead of just getting hammered on a fixed retry schedule. It's also crash-durable: a webhook still pending when the node restarts is recovered and retried the same way a queued job is. Retries trigger on connection errors, `5xx`, `408` and `429`, with exponential backoff capped at `SPILLWAY_RETRY_MAX_BACKOFF_SECONDS` (300). The default is 10 retries, about 13 minutes: enough to ride out a receiver deploy or restart, and a receiver that stays down longer fails its webhooks rather than piling them up (the result stays readable at `GET /jobs/:id`). Set `"webhook_max_retries"` on the job (or the `X-Aqueduct-Webhook-Max-Retries` header, which wins) to change that for this job's webhook only, separately from `max_retries` for the upstream call: `0` sends it once, `4` gives up after about 15 seconds, and `-1` keeps retrying until the receiver accepts it, for up to 24 hours. Every retryable failure halves the queue's pace; an `X-Aqueduct-Rps` on a failed response can only lower it further, never raise it, so a receiver that stamps the same rate on every response, `503`s included, still gets backed off while it's down. Drain mode's own ledger-flush webhook is unaffected: it stays synchronous, confirming delivery before clearing the local idempotency ledger.
