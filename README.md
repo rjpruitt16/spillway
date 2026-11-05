@@ -20,7 +20,7 @@ A spillway is how a dam lets out water it can't hold, at a rate the river below 
 
 **Redis or SQS plus a rate-limited worker** can do the core of this. Spillway gives you the rest without writing it: a queue per tenant with fair admission, a pace the target sets live (`X-Aqueduct-*` response headers, or vLLM's and Triton's load reports) instead of a fixed worker rate, `POST /proxy` falling back to the queue on the same connection, idempotency keys, and results by stream or webhook.
 
-**Hookdeck** queues inbound webhooks as a hosted service, billed by usage. Spillway runs on your own machines, so scaling it costs only the machines you add, and it also paces outbound API calls, agent tool calls and WebSocket sessions.
+**Hookdeck** queues inbound webhooks as a hosted service, billed by usage. Spillway runs on your own machines: there's no per-event fee, but you run and pay for the infrastructure. It also paces outbound API calls, agent tool calls and WebSocket sessions.
 
 **Temporal** makes workflows durable and can cap how fast a task queue runs, but that cap is a number you set, not what the downstream reports it can take right now.
 
