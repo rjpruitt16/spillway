@@ -42,5 +42,5 @@ Client → POST /jobs → Spillway → paced outbound requests → Your API
 
 1. **Submit a job**: POST the request you want forwarded, with a `webhook_url` for the response.
 2. **Spillway queues it**: jobs are held in memory and dispatched at the configured RPS.
-3. **Your API responds**: Spillway reads pacing headers from the response and adjusts automatically, falling back to the real [ORCA](https://github.com/cncf/xds/blob/main/xds/data/orca/v3/orca_load_report.proto) standard for backends that report load a different way (vLLM and Triton/TensorRT-LLM both work today). See [Per-tenant fairness](pacing.md) below for the full header reference.
+3. **Your API responds**: Spillway reads pacing headers from the response and adjusts automatically, falling back to the real [ORCA](https://github.com/cncf/xds/blob/main/xds/data/orca/v3/orca_load_report.proto) standard for backends that report load a different way (vLLM and Triton/TensorRT-LLM both work today). See [Per-tenant fairness](pacing.md) for the full header reference.
 4. **Stay on the line or hang up**: open `GET /jobs/:id/stream` to receive live events as the job moves through the queue, or disconnect and the result is delivered to your `webhook_url` when ready.

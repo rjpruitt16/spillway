@@ -32,9 +32,9 @@ They combine: Envoy in front as the gateway, Hookdeck delivering webhooks into S
 
 ## Results
 
-- **112 hours under chaos, 0 jobs lost.** One performance-2x Fly machine took 185.3M jobs at 500 jobs/s from 50 users, with a target, webhook receiver and WebSocket backend that kept switching between healthy, slow, erroring and down, a `kill -9` every 3–5 hours and a machine reboot every 36. Across 28 restarts nothing was lost; 9,956 webhooks were delivered twice, all within 10 minutes of a restart ([write-up](benchmark/soak/results/run-3l/README.md)).
+- **112 hours under chaos, 0 jobs lost.** One performance-2x Fly machine took 185.3M jobs at 500 jobs/s from 50 users, with a target, webhook receiver and WebSocket backend that kept switching between healthy, slow, erroring and down, a `kill -9` every 3–5 hours and a machine reboot every 36. Across 28 restarts no accepted job was lost; 9,956 webhooks were delivered twice, all within 10 minutes of a restart. Not everything held: 7,801 of 83.7M WebSocket commands (0.009%) didn't complete within 5 minutes, 262 jobs finished without their webhook, and jobs whose runner died waited for the next restart to be recovered (fixed since in #72 and #78). [Write-up](benchmark/soak/results/run-3l/README.md).
 - **vLLM's queue: 447 waiting requests direct, 0 through Spillway,** at the same 40 requests a second. Spillway sent vLLM one request at a time here, because its concurrency starts at 1 and vLLM doesn't send a header to raise it ([#7](https://github.com/rjpruitt16/spillway/issues/7)), so this run didn't exercise its load-report pacing end to end.
-- **Capacity per machine,** accepting, dispatching and delivering a webhook for every job: about 700 jobs/s on a Fly performance-1x, 1,300–1,500 on a 2x, and 3,000 on a 4x, where it sheds with `429` past the ceiling and drains back to zero.
+- **Capacity per machine** (measured 2026-10-07, on the Mnesia store that RocksDB has since replaced), accepting, dispatching and delivering a webhook for every job: about 700 jobs/s on a Fly performance-1x, 1,300–1,500 on a 2x, and 3,000 on a 4x, where it sheds with `429` past the ceiling and drains back to zero.
 
 Methods and caveats: [benchmark.md](benchmark.md), and the end-to-end tests of the Aqueduct protocol in [aqueduct-benchmarks](https://github.com/rjpruitt16/aqueduct-benchmarks).
 
@@ -55,7 +55,7 @@ Or from source, with Elixir installed: `mix setup && mix phx.server`.
 
 `SPILLWAY_DEFAULT_RPS` sets how many requests a second each target gets (2 if unset), one at a time. The target can change its pace live with `X-Aqueduct-Rps` and `X-Aqueduct-Max-Concurrent` response headers.
 
-Send it a job and watch it go through the line:
+Send it a job, then read the result:
 
 ```bash
 curl -s localhost:4000/jobs -H 'Content-Type: application/json' -d '{
@@ -64,9 +64,8 @@ curl -s localhost:4000/jobs -H 'Content-Type: application/json' -d '{
 }'
 # {"job_id":"…","status":"queued"}
 
-curl -N localhost:4000/jobs/<job_id>/stream
-# event: queued
-# event: completed   (data carries the target API's response_status and body)
+curl -s localhost:4000/jobs/<job_id>
+# {"job_id":"…","status":"completed",…,"result":{"response_status":200,"body":"…"}}
 ```
 
 Fly.io and Kubernetes setups are in [Running and deploying](docs/deployment.md).

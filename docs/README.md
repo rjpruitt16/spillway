@@ -1,6 +1,6 @@
 # Spillway documentation
 
-Start with the [README](../README.md) for what Spillway is and a quick start.
+Start with the [README](../README.md) for what Spillway is and a quick start, and [Why Spillway](why.md) for the longer case.
 
 - [Use cases](use-cases.md): protecting your API, pacing calls to a rate-limited resource, `POST /proxy` at the edge, and the WebSocket proxy.
 - [Pacing and per-tenant fairness](pacing.md): `X-Aqueduct-*` headers, AccountQueue mode, the ORCA fallback for vLLM and Triton, and webhook pacing.
