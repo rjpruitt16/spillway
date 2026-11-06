@@ -110,7 +110,7 @@ defmodule Spillway.IdempotentStore do
   """
   def check_or_insert(%Job{} = job) do
     hashed = hash_key(job)
-    expires_at = System.system_time(:millisecond) + ttl_ms(:queued)
+    expires_at = expires_at(:queued, job)
 
     result =
       with_key_gate(hashed, fn ->
@@ -324,7 +324,7 @@ defmodule Spillway.IdempotentStore do
   defp status_change(job_id, status) do
     case read_job_row(job_id) do
       {job, old_expires, old_status} ->
-        new_expires = System.system_time(:millisecond) + ttl_ms(status)
+        new_expires = expires_at(status, job)
         hashed = hash_key(job)
 
         key_ops =
@@ -385,7 +385,7 @@ defmodule Spillway.IdempotentStore do
               {:duplicate, []}
 
             nil ->
-              expires_at = System.system_time(:millisecond) + ttl_ms(:queued)
+              expires_at = expires_at(:queued, delivery)
 
               {:inserted,
                [
@@ -425,7 +425,7 @@ defmodule Spillway.IdempotentStore do
   end
 
   defp record_retry_local(%Job{} = job) do
-    expires_at = System.system_time(:millisecond) + ttl_ms(:queued)
+    expires_at = expires_at(:queued, job)
 
     old_index =
       case read_job_row(job.id) do
@@ -1115,6 +1115,21 @@ defmodule Spillway.IdempotentStore do
   # A pending row outlives Job.queue_deadline_ms/1 by this much, so the queue
   # always fails the job (and sends its webhook) before cleanup can delete it.
   defp ttl_ms(_), do: Job.queued_ttl_ms() + @pending_row_grace_ms
+
+  # When a row in `status` expires. A pending row also lasts until the job's
+  # own queue deadline plus the grace, so an execute_before further out than
+  # the TTL isn't deleted before the queue can fail it.
+  defp expires_at(status, _job) when status in [:completed, :failed],
+    do: System.system_time(:millisecond) + ttl_ms(status)
+
+  defp expires_at(status, job) do
+    by_ttl = System.system_time(:millisecond) + ttl_ms(status)
+
+    case Job.queue_deadline_ms(Job.upgrade(job)) do
+      deadline when is_integer(deadline) -> max(by_ttl, deadline + @pending_row_grace_ms)
+      _none -> by_ttl
+    end
+  end
 
   defp schedule_cleanup do
     Process.send_after(self(), :cleanup, @cleanup_interval_ms)

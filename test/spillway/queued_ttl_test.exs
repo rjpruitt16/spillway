@@ -45,6 +45,25 @@ defmodule Spillway.QueuedTTLTest do
     assert Job.queue_deadline_ms(%Job{created_at: nil}) == nil
   end
 
+  test "a pending row lasts past the job's own deadline, even one beyond the TTL", %{base: base} do
+    now = System.system_time(:millisecond)
+    far = now + 2 * Job.queued_ttl_ms()
+    default = job(base, "/unused", now)
+    long = %{job(base, "/unused", now) | execute_before: far}
+    :ok = IdempotentStore.check_or_insert(default)
+    :ok = IdempotentStore.check_or_insert(long)
+
+    {:ok, {_, default_expires, :queued}} = Spillway.Store.get(:jobs, default.id)
+    {:ok, {_, long_expires, :queued}} = Spillway.Store.get(:jobs, long.id)
+    assert default_expires > Job.queue_deadline_ms(default)
+    assert long_expires > far
+
+    # A status change keeps the same floor.
+    :ok = IdempotentStore.update_status(long.id, :in_flight)
+    {:ok, {_, in_flight_expires, :in_flight}} = Spillway.Store.get(:jobs, long.id)
+    assert in_flight_expires > far
+  end
+
   test "a job queued past the TTL fails with a webhook instead of vanishing", %{base: base} do
     job = job(base, "/unused", System.system_time(:millisecond) - Job.queued_ttl_ms() - 1_000)
     queue = start_queue(base)
