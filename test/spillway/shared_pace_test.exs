@@ -39,6 +39,29 @@ defmodule Spillway.SharedPaceTest do
       assert SharedPace.reserve(domain, :a) in 1..10
     end
 
+    test "the latest advertised rate wins", %{domain: domain} do
+      SharedPace.set_ceiling(domain, 2.0)
+      SharedPace.advertise(domain, 50.0)
+      SharedPace.advertise(domain, 2.0)
+      SharedPace.advertise(domain, 50.0)
+      assert SharedPace.rate(domain) == 50.0
+    end
+
+    test "a new owner takes over, and the old one going down doesn't stop the pace",
+         %{domain: domain} do
+      old = spawn(fn -> Process.sleep(:infinity) end)
+      new = spawn(fn -> Process.sleep(:infinity) end)
+      SharedPace.set_ceiling(domain, 5.0, old)
+      SharedPace.set_ceiling(domain, 7.0, new)
+      Process.exit(old, :kill)
+      Process.sleep(50)
+      assert SharedPace.rate(domain) == 7.0
+
+      Process.exit(new, :kill)
+      Process.sleep(50)
+      assert SharedPace.rate(domain) == nil
+    end
+
     test "never paces slower than the 0.5 rps floor", %{domain: domain} do
       SharedPace.set_ceiling(domain, 0.01)
       assert SharedPace.reserve(domain, :a) == 0
@@ -79,13 +102,27 @@ defmodule Spillway.SharedPaceTest do
     port = 28_000 + rem(System.unique_integer([:positive]), 2_000)
     {:ok, server} = Bandit.start_link(plug: Target, port: port, startup_log: false)
 
-    on_exit(fn ->
-      if Process.alive?(server), do: Process.exit(server, :kill)
-    end)
-
     base = "http://localhost:#{port}"
 
-    for n <- 1..400, tenant <- ~w(a b c) do
+    # Stop this test's queues before the server, so nothing keeps retrying
+    # against it into later tests, and drop its jobs.
+    on_exit(fn ->
+      case :ets.lookup(:url_actors, base) do
+        [{_, actor}] ->
+          queues = :sys.get_state(actor).queues |> Map.values()
+          Enum.each([actor | queues], &Process.exit(&1, :kill))
+
+        [] ->
+          :ok
+      end
+
+      if Process.alive?(server), do: Process.exit(server, :kill)
+      Spillway.IdempotentStore.clear_ledger()
+    end)
+
+    # 150 per tenant keeps every queue backlogged through the 8 s measured
+    # (about 10/s each).
+    for n <- 1..150, tenant <- ~w(a b c) do
       job = %Job{
         id: "pace-#{tenant}-#{n}-#{System.unique_integer([:positive])}",
         user_id: "pace-#{tenant}",

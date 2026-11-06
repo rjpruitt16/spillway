@@ -49,11 +49,19 @@ defmodule Spillway.SharedPace do
   pool's live capacity. Starts the pace process if needed. `owner` (the
   UrlActor) is monitored; the process stops when it goes down.
   """
-  def set_ceiling(domain, ceiling, owner \\ self()) do
-    case ensure_started(domain) do
-      {:ok, pid} -> GenServer.cast(pid, {:ceiling, ceiling, owner})
-      _error -> :ok
+  def set_ceiling(domain, ceiling, owner \\ self()), do: set_ceiling(domain, ceiling, owner, 3)
+
+  # Synchronous, and retried: a pace process can be exiting because its
+  # previous owner went down just as a new UrlActor sets the ceiling, and a
+  # cast to it would be lost, leaving the domain without a shared limit.
+  defp set_ceiling(_domain, _ceiling, _owner, 0), do: :ok
+
+  defp set_ceiling(domain, ceiling, owner, tries) do
+    with {:ok, pid} <- ensure_started(domain) do
+      GenServer.call(pid, {:ceiling, ceiling, owner}, 1_000)
     end
+  catch
+    :exit, _reason -> set_ceiling(domain, ceiling, owner, tries - 1)
   end
 
   @doc """
@@ -113,6 +121,7 @@ defmodule Spillway.SharedPace do
        ceiling: nil,
        advertised: nil,
        owner: nil,
+       owner_ref: nil,
        pool_rate: 0.0,
        pool_read_at: nil,
        last: nil,
@@ -121,21 +130,22 @@ defmodule Spillway.SharedPace do
   end
 
   @impl true
-  def handle_cast({:ceiling, ceiling, owner}, state) do
+  def handle_cast({:advertised, rps}, state), do: {:noreply, %{state | advertised: rps}}
+
+  @impl true
+  def handle_call({:ceiling, ceiling, owner}, _from, state) do
     state =
       if state.owner == owner do
         state
       else
-        Process.monitor(owner)
-        %{state | owner: owner}
+        # A new UrlActor took over: stop watching the old one.
+        if state.owner_ref, do: Process.demonitor(state.owner_ref, [:flush])
+        %{state | owner: owner, owner_ref: Process.monitor(owner)}
       end
 
-    {:noreply, %{state | ceiling: ceiling, advertised: nil, pool_read_at: nil}}
+    {:reply, :ok, %{state | ceiling: ceiling, advertised: nil, pool_read_at: nil}}
   end
 
-  def handle_cast({:advertised, rps}, state), do: {:noreply, %{state | advertised: rps}}
-
-  @impl true
   def handle_call({:reserve, who}, _from, state) do
     now = System.monotonic_time(:microsecond)
     {rate, state} = current_rate(state, now)

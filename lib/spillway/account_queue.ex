@@ -1620,8 +1620,9 @@ defmodule Spillway.AccountQueue do
     if state.in_flight > 0, do: backlog_add(-1)
 
     # The target's advertised rate is its total, shared by every tenant
-    # queue; tell the shared pace when it changes.
-    if is_number(rps_header) and rps_header != state.rps,
+    # queue; the latest one wins, so every answer that carries one says so,
+    # not only one that changes this queue's own rate.
+    if is_number(rps_header),
       do: SharedPace.advertise(state.upstream, max(rps_header, @min_rps))
 
     if new_state.rps != state.rps do
