@@ -28,6 +28,8 @@ defmodule Spillway.IdempotentStore do
   require Logger
 
   alias Spillway.Job
+
+  @pending_row_grace_ms 15 * 60 * 1_000
   alias Spillway.Cluster
   alias Spillway.Store
 
@@ -1110,7 +1112,9 @@ defmodule Spillway.IdempotentStore do
 
   defp ttl_ms(:completed), do: 30 * 60 * 1_000
   defp ttl_ms(:failed), do: 2 * 60 * 60 * 1_000
-  defp ttl_ms(_), do: Application.get_env(:spillway, :idempotent_ttl, 86_400) * 1_000
+  # A pending row outlives Job.queue_deadline_ms/1 by this much, so the queue
+  # always fails the job (and sends its webhook) before cleanup can delete it.
+  defp ttl_ms(_), do: Job.queued_ttl_ms() + @pending_row_grace_ms
 
   defp schedule_cleanup do
     Process.send_after(self(), :cleanup, @cleanup_interval_ms)

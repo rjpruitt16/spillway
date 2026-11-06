@@ -2,7 +2,7 @@
 
 ## Idempotency
 
-Every job requires an `idempotent_key`. Submitting the same key twice **for the same `user_id`** returns the original job ID without re-executing the request; different users can safely use the same `idempotent_key` without colliding with each other. Keys expire after 24 hours (configurable).
+Every job requires an `idempotent_key`. Submitting the same key twice **for the same `user_id`** returns the original job ID without re-executing the request; different users can safely use the same `idempotent_key` without colliding with each other. Keys expire after 24 hours (configurable). A job still waiting in the queue when its key's 24 hours run out fails with `reason: "queued_ttl_exceeded"` and sends its webhook, so the caller hears about it instead of the job disappearing. A job's own `execute_before` gives up sooner, with `reason: "execution_deadline_exceeded"`.
 
 **Shared scope.** With `SPILLWAY_SHARED_IDEMPOTENCY_ENABLED=true`, a job can set `"idempotency_scope": "shared"` to dedup on `idempotent_key` alone, across every `user_id`. Many agents asking for the same resource then coalesce onto one upstream call: later callers get `200 + "duplicate": true` with the first job's ID and can poll or stream it; they don't get their own webhook. Anyone who knows a shared key can read its result, so use keys that name a public resource (`weather:sf:2026-10-05`), never a user's private data. Shared keys live in the same RocksDB store as every other job, so they survive a crash.
 
