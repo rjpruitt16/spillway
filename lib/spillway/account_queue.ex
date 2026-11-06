@@ -19,6 +19,7 @@ defmodule Spillway.AccountQueue do
   alias Spillway.AccountQueueRegistry
   alias Spillway.Pool
   alias Spillway.Jitter
+  alias Spillway.SharedPace
   alias Spillway.Admission
   alias Spillway.Cluster
   alias Spillway.UserLoad
@@ -58,7 +59,8 @@ defmodule Spillway.AccountQueue do
     # At the 0.5 rps floor after an upstream outage that was 2s per job, so
     # a full queue barely drained and every new job was refused (soak run 3e).
     dispatch_timer: nil,
-    # Earliest execute_before among queued jobs (ms), nil when none has one.
+    # Earliest Job.queue_deadline_ms/1 among queued jobs (ms), nil when none
+    # has one.
     # expire_queued_jobs/1 runs on every :process_next; without this it
     # copied and filtered the whole queue each time, which grew
     # quadratically once a backlog built up.
@@ -520,7 +522,9 @@ defmodule Spillway.AccountQueue do
 
   @impl true
   def handle_info(:broadcast_positions, state) do
-    state = %{state | positions_scheduled: false}
+    # Also expire here: :process_next can go quiet for a long time while
+    # every slot is busy on a hung upstream, and a deadline still has to fire.
+    state = expire_queued_jobs(%{state | positions_scheduled: false})
     # On a standalone node every subscriber is local, so skip jobs nobody is
     # streaming. Broadcasting for every queued job blocked this process for
     # long stretches once a backlog built, and submissions waited on it.
@@ -597,9 +601,17 @@ defmodule Spillway.AccountQueue do
     interval_ms = trunc(1_000 / state.rps)
     elapsed = System.system_time(:millisecond) - state.last_request_at
 
-    if elapsed < interval_ms,
-      do: {:wait, arm_dispatch_timer(state, Jitter.add_ms(interval_ms - elapsed))},
-      else: dispatch_due(state)
+    cond do
+      elapsed < interval_ms ->
+        {:wait, arm_dispatch_timer(state, Jitter.add_ms(interval_ms - elapsed))}
+
+      # The target's total across every tenant queue (aquifer#146).
+      (wait_ms = SharedPace.reserve(state.upstream)) > 0 ->
+        {:wait, arm_dispatch_timer(state, wait_ms)}
+
+      true ->
+        dispatch_due(state)
+    end
   end
 
   defp arm_dispatch_timer(%{dispatch_timer: nil} = state, delay_ms),
@@ -806,9 +818,13 @@ defmodule Spillway.AccountQueue do
       else: scan_expired_jobs(state)
   end
 
-  defp earliest_deadline(current, %Job{execute_before: before})
-       when is_integer(before) and before > 0,
-       do: if(current == nil or before < current, do: before, else: current)
+  defp earliest_deadline(current, %Job{} = job) do
+    case Job.queue_deadline_ms(job) do
+      nil -> current
+      deadline when current == nil or deadline < current -> deadline
+      _deadline -> current
+    end
+  end
 
   defp earliest_deadline(current, _job), do: current
 
@@ -816,7 +832,7 @@ defmodule Spillway.AccountQueue do
     {kept, expired} =
       state.queue
       |> :queue.to_list()
-      |> Enum.split_with(&(not Job.execution_expired?(&1)))
+      |> Enum.split_with(&(not Job.queue_expired?(&1)))
 
     state = %{state | next_deadline: Enum.reduce(kept, nil, &earliest_deadline(&2, &1))}
 
@@ -839,7 +855,12 @@ defmodule Spillway.AccountQueue do
 
   defp fail_expired_job(job, upstream) do
     UserLoad.done(job)
-    reason = "execution_deadline_exceeded"
+    # A caller's own deadline, or the queued-job TTL for a job without one.
+    reason =
+      if Job.execution_expired?(job),
+        do: "execution_deadline_exceeded",
+        else: "queued_ttl_exceeded"
+
     payload = %{job_id: job.id, status: "failed", reason: reason}
 
     IdempotentStore.put_result(job.id, payload, :failed)
@@ -1609,6 +1630,12 @@ defmodule Spillway.AccountQueue do
       |> Map.put(:in_flight, max(state.in_flight - 1, 0))
 
     if state.in_flight > 0, do: backlog_add(-1)
+
+    # The target's advertised rate is its total, shared by every tenant
+    # queue; the latest one wins, so every answer that carries one says so,
+    # not only one that changes this queue's own rate.
+    if is_number(rps_header),
+      do: SharedPace.advertise(state.upstream, max(rps_header, @min_rps))
 
     if new_state.rps != state.rps do
       Metrics.flow_rate(state.upstream, new_state.rps)

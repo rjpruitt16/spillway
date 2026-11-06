@@ -229,8 +229,9 @@ defmodule Spillway.IntakeTest do
     {micros, _} = :timer.tc(fn -> :sys.get_state(queue, 1_000) end)
     assert micros < 300_000
 
-    # Raising the pace drains the rest now, not one per 2s.
-    AccountQueue.update_rps(queue, 1_000.0)
+    # Raising the target's pace drains the rest now, not one per 2s. It goes
+    # through the UrlActor: a queue alone can't raise the target's total.
+    UrlActor.update_rps(actor, 1_000.0)
     for _ <- 2..5, do: assert_receive(:hit, 1_500)
   end
 
