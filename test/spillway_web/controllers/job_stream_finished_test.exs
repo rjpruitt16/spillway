@@ -55,6 +55,32 @@ defmodule SpillwayWeb.JobStreamFinishedTest do
     assert id == job.id
   end
 
+  test "a finished job whose result expired still ends the stream" do
+    stamp = System.unique_integer([:positive])
+
+    job = %Job{
+      id: "stream-expired-#{stamp}",
+      user_id: "stream-user",
+      idempotent_key: "stream-expired-key-#{stamp}",
+      url: "http://127.0.0.1:1/unused",
+      method: "POST",
+      headers: %{},
+      body: "",
+      webhook_url: "",
+      kind: :user,
+      status: :queued,
+      created_at: System.system_time(:millisecond)
+    }
+
+    :ok = IdempotentStore.check_or_insert(job)
+    # Finished, with no stored result (as after the result expired).
+    IdempotentStore.finish(job.id, :completed, nil)
+    body = stream_body(job)
+
+    assert [_, data] = Regex.run(~r/event: completed\ndata: (.*)\n/, body)
+    assert %{"result_expired" => true, "status" => "completed"} = Jason.decode!(data)
+  end
+
   test "a failed job's stream sends the failure and ends" do
     job = finished_job(:failed, %{status: "failed", reason: "upstream returned 400"})
     body = stream_body(job)
