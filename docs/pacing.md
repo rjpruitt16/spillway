@@ -26,7 +26,7 @@ Critically, each user can run at a **different pace**. If your service processes
 
 Disable it any time by responding with `X-Aqueduct-Account-Queue: disabled`.
 
-Each tenant's own pace is still capped by the upstream's actual budget, though: a background check keeps the *sum* of every active tenant queue's rate within the upstream's configured (or, for a pool-backed upstream, live aggregate) ceiling, throttling proportionally if too many tenants are active at once. Isolation between tenants doesn't mean each one gets its own unbounded copy of the full rate.
+Isolation between tenants doesn't give each one its own copy of the full rate. Every tenant queue for an upstream takes its dispatch slots from one shared pace, so the upstream sees at most its ceiling in total however many tenants are active: the rate it last advertised in `X-Aqueduct-Rps` (or ORCA), otherwise the configured rate, or for a pool-backed upstream its live aggregate capacity. Slots go to queues in the order they started waiting, so a tenant with a steady stream of new jobs can't crowd out one with a static backlog. In a cluster, a background check also scales the queues on every node down to the same ceiling.
 
 `X-Aqueduct-*` is read first if both namespaces are present: the shared protocol namespace also spoken by [Aquifer](https://github.com/rjpruitt16/aquifer), so a backend already emitting Aqueduct headers works against either implementation unchanged.
 

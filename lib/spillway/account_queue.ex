@@ -19,6 +19,7 @@ defmodule Spillway.AccountQueue do
   alias Spillway.AccountQueueRegistry
   alias Spillway.Pool
   alias Spillway.Jitter
+  alias Spillway.SharedPace
   alias Spillway.Admission
   alias Spillway.Cluster
   alias Spillway.UserLoad
@@ -597,9 +598,17 @@ defmodule Spillway.AccountQueue do
     interval_ms = trunc(1_000 / state.rps)
     elapsed = System.system_time(:millisecond) - state.last_request_at
 
-    if elapsed < interval_ms,
-      do: {:wait, arm_dispatch_timer(state, Jitter.add_ms(interval_ms - elapsed))},
-      else: dispatch_due(state)
+    cond do
+      elapsed < interval_ms ->
+        {:wait, arm_dispatch_timer(state, Jitter.add_ms(interval_ms - elapsed))}
+
+      # The target's total across every tenant queue (aquifer#146).
+      (wait_ms = SharedPace.reserve(state.upstream)) > 0 ->
+        {:wait, arm_dispatch_timer(state, wait_ms)}
+
+      true ->
+        dispatch_due(state)
+    end
   end
 
   defp arm_dispatch_timer(%{dispatch_timer: nil} = state, delay_ms),
@@ -1609,6 +1618,11 @@ defmodule Spillway.AccountQueue do
       |> Map.put(:in_flight, max(state.in_flight - 1, 0))
 
     if state.in_flight > 0, do: backlog_add(-1)
+
+    # The target's advertised rate is its total, shared by every tenant
+    # queue; tell the shared pace when it changes.
+    if is_number(rps_header) and rps_header != state.rps,
+      do: SharedPace.advertise(state.upstream, max(rps_header, @min_rps))
 
     if new_state.rps != state.rps do
       Metrics.flow_rate(state.upstream, new_state.rps)
