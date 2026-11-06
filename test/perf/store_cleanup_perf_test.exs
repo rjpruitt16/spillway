@@ -98,9 +98,13 @@ defmodule Spillway.StoreCleanupPerfTest do
       "cleanup perf: #{total} jobs written (#{round(rate)}/s), #{:counters.get(deleted, 1)} expired, store peak #{peak_early} in the first half, #{peak_late} in the second"
     )
 
-    # Bounded: late in the run the store holds no more than about a second of
-    # intake beyond its early peak, instead of growing with the run.
-    assert peak_late <= peak_early + round(rate),
+    # At least 10 samples in each half, or there is nothing to compare.
+    assert length(sizes) >= 20, "only #{length(sizes)} store samples in #{@duration_ms} ms"
+
+    # Bounded: the late peak stays within half again the early one (plus a
+    # little), instead of growing with the run. A sustained cleanup deficit of
+    # 50 jobs/s adds about 500 jobs a half and fails this.
+    assert peak_late <= peak_early * 1.5 + 100,
            "store kept growing: #{peak_early} early, #{peak_late} late, at #{round(rate)} jobs/s"
   end
 end
