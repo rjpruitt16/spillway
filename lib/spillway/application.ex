@@ -81,6 +81,8 @@ defmodule Spillway.Application do
           Spillway.Admission,
           Spillway.IdempotentStore,
           Spillway.PoolRegistry,
+          {Registry, keys: :unique, name: Spillway.SharedPaceRegistry},
+          {DynamicSupervisor, name: Spillway.SharedPaceSupervisor, strategy: :one_for_one},
           Spillway.RemoteBacklog,
           Spillway.AccountQueueRegistry,
           {Spillway.Recovery, recovered}

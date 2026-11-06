@@ -140,9 +140,6 @@ defmodule Spillway.Job do
   @default_max_retries 4
   @default_webhook_max_retries 10
   @max_allowed_retries 100
-  # Bounds retry_until_complete when there is no execute_before: the same
-  # 24h default the idempotency TTL uses for queued jobs.
-  @default_retry_window_ms 86_400_000
 
   @doc """
   Retries for retryable failures (connection errors, 5xx, 408, 429): 4 by
@@ -175,7 +172,7 @@ defmodule Spillway.Job do
       do: before
 
   def retry_deadline_ms(%__MODULE__{created_at: created_at}),
-    do: (created_at || System.system_time(:millisecond)) + @default_retry_window_ms
+    do: (created_at || System.system_time(:millisecond)) + queued_ttl_ms()
 
   defp parse_max_retries(nil), do: {:ok, @default_max_retries}
 
@@ -314,6 +311,32 @@ defmodule Spillway.Job do
   """
   def upgrade(%__MODULE__{} = job), do: struct(__MODULE__, Map.from_struct(job))
   def upgrade(other), do: other
+
+  @doc """
+  When a still-queued job gives up: its execute_before, or the queued-job TTL
+  (:idempotent_ttl, 24 hours by default) after it was submitted. The store
+  keeps a queued row a little past this, so the queue fails the job and sends
+  its webhook before cleanup could delete it without a word (#5). nil for a
+  job with no submission time (rows written by old versions).
+  """
+  def queue_deadline_ms(%__MODULE__{execute_before: before})
+      when is_integer(before) and before > 0,
+      do: before
+
+  def queue_deadline_ms(%__MODULE__{created_at: created_at}) when is_integer(created_at),
+    do: created_at + queued_ttl_ms()
+
+  def queue_deadline_ms(_job), do: nil
+
+  def queue_expired?(job) do
+    case queue_deadline_ms(job) do
+      nil -> false
+      deadline -> System.system_time(:millisecond) >= deadline
+    end
+  end
+
+  @doc "How long a job may stay queued, from :idempotent_ttl (seconds)."
+  def queued_ttl_ms, do: Application.get_env(:spillway, :idempotent_ttl, 86_400) * 1_000
 
   def execution_expired?(%__MODULE__{execute_before: nil}), do: false
   def execution_expired?(%__MODULE__{execute_before: 0}), do: false

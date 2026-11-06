@@ -180,6 +180,7 @@ defmodule Spillway.UrlActor do
     Phoenix.PubSub.subscribe(Spillway.PubSub, cluster_topic(domain))
     state = initial_state |> hydrate_cluster_state() |> publish()
     :ok = Cluster.join_url_actor(domain, self())
+    set_shared_ceiling(state)
 
     # No schedule_budget_check/0 here -- see handle_call({:enqueue, ...})
     # below, which is what actually starts it, and
@@ -309,10 +310,13 @@ defmodule Spillway.UrlActor do
 
   @impl true
   def handle_cast({:update_rps, rps}, state) do
+    # The shared ceiling first, so a queue woken by the new rate doesn't
+    # re-check against the old one.
+    state = set_shared_ceiling(%{state | rps: rps})
     Enum.each(all_queue_pids(state), &AccountQueue.update_rps(&1, rps))
     broadcast_cluster_state(state, :rps, rps)
 
-    {:noreply, %{state | rps: rps}, idle_timeout_ms()}
+    {:noreply, state, idle_timeout_ms()}
   end
 
   @impl true
@@ -357,8 +361,9 @@ defmodule Spillway.UrlActor do
 
   @impl true
   def handle_info({:cluster_url_state, :rps, rps}, state) do
+    state = set_shared_ceiling(%{state | rps: rps})
     Enum.each(all_queue_pids(state), &AccountQueue.update_rps(&1, rps))
-    {:noreply, %{state | rps: rps}, idle_timeout_ms()}
+    {:noreply, state, idle_timeout_ms()}
   end
 
   def handle_info({:cluster_url_state, :max_concurrent, max}, state) do
@@ -415,8 +420,17 @@ defmodule Spillway.UrlActor do
 
   @impl true
   def handle_info(:check_aggregate_budget, state) do
-    queue_pids = Enum.filter(all_queue_pids(state), &safe_queue_active?/1)
-    ceiling = budget_ceiling(state)
+    # On one node Spillway.SharedPace already holds the total, slot by slot;
+    # this check is only for queues spread over a cluster. It reads the same
+    # ceiling the pace does (the target's advertised rate when it sent one).
+    # Using the configured rate instead held a target advertising 30 rps to
+    # about half of that, by cutting every queue toward the 2 rps default.
+    queue_pids =
+      if Cluster.standalone?(),
+        do: [],
+        else: Enum.filter(all_queue_pids(state), &safe_queue_active?/1)
+
+    ceiling = Spillway.SharedPace.rate(state.domain) || budget_ceiling(state)
 
     # A single active queue (or none) can't exceed an aggregate budget by
     # definition -- nothing to throttle. Reading each queue's rate means
@@ -761,6 +775,18 @@ defmodule Spillway.UrlActor do
       {n, _} -> n
       :error -> default
     end
+  end
+
+  # Every account queue for this domain takes its dispatch slots from one
+  # Spillway.SharedPace running at the same ceiling budget_ceiling/1 reads.
+  defp set_shared_ceiling(%{pool_pid: nil} = state) do
+    Spillway.SharedPace.set_ceiling(state.domain, state.rps)
+    state
+  end
+
+  defp set_shared_ceiling(state) do
+    Spillway.SharedPace.set_ceiling(state.domain, {:pool, state.pool_pid})
+    state
   end
 
   # Live pool capacity if pool-backed, otherwise the statically
