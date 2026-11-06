@@ -66,8 +66,28 @@ defmodule SpillwayWeb.JobStreamController do
     status = IdempotentStore.get_status(job.id)
     conn = send_catchup_events(conn, job.id, status)
 
-    listen_loop(conn, job)
+    # A job that finished before this stream subscribed published its
+    # terminal event to nobody; send the stored result and end the stream
+    # instead of waiting for an event that already went out (#91). The
+    # result is stored before the status changes, so it's there.
+    case finished_event(job.id, status) do
+      nil ->
+        listen_loop(conn, job)
+
+      {event, data} ->
+        {_, conn} = chunk(conn, sse_event(event, data))
+        conn
+    end
   end
+
+  defp finished_event(job_id, status) when status in ["completed", "failed"] do
+    case IdempotentStore.get_result(job_id) do
+      result when is_map(result) -> {status, Map.put(result, :event, status)}
+      _ -> nil
+    end
+  end
+
+  defp finished_event(_job_id, _status), do: nil
 
   # Send synthetic events for states the client missed by connecting late
   defp send_catchup_events(conn, job_id, status) do
