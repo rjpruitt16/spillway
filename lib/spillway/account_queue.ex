@@ -612,7 +612,9 @@ defmodule Spillway.AccountQueue do
       true ->
         # The target's total across every tenant queue (aquifer#146), split
         # by the rate it advertises to each.
-        weight = max(state.rps, state.advertised || 0)
+        # The rate the target advertised to this queue while it holds; only
+        # with none is it the queue's own pace.
+        weight = state.advertised || state.rps
 
         case SharedPace.reserve_slot(
                state.upstream,
@@ -643,6 +645,17 @@ defmodule Spillway.AccountQueue do
     end
   end
 
+  # When the queue's own pace counts this dispatch from: the shared pace's
+  # slot, not now, but never earlier than one own interval after the previous
+  # one. A slot carrying unused shared credit would otherwise let a 1 rps
+  # queue under an idle 10 rps total dispatch every 900 ms.
+  defp own_slot(state, slot_age_ms) do
+    max(
+      System.system_time(:millisecond) - slot_age_ms,
+      state.last_request_at + trunc(1_000 / state.rps)
+    )
+  end
+
   # slot_age_ms: how long ago the shared pace scheduled this dispatch's slot.
   # The queue's own pace counts from the slot, not from now, so its timer
   # jitter doesn't push it behind the slot schedule (see SharedPace).
@@ -663,7 +676,7 @@ defmodule Spillway.AccountQueue do
           | queue: remaining_queue,
             queued: max(state.queued - 1, 0),
             in_flight: state.in_flight + 1,
-            last_request_at: System.system_time(:millisecond) - slot_age_ms
+            last_request_at: own_slot(state, slot_age_ms)
         }
 
         Metrics.queue_depth(state.upstream, new_state.queued)

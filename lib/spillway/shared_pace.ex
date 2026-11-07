@@ -146,7 +146,18 @@ defmodule Spillway.SharedPace do
        pool_read_at: nil,
        last: nil,
        vtime: 0.0,
-       queues: %{}
+       queues: %{},
+       # The queues whose window hasn't closed, the only ones a reservation
+       # looks at: scanning thousands of recently drained queues on every
+       # reservation would cost real CPU. Idle ones are swept out of :queues
+       # at most once a second.
+       contenders: MapSet.new(),
+       swept: nil,
+       # The highest rate advertised to a queue active in the last
+       # @active_us, and that queue; recomputed only when it lowers its rate
+       # or goes quiet.
+       top: nil,
+       top_who: nil
      }}
   end
 
@@ -166,9 +177,11 @@ defmodule Spillway.SharedPace do
 
   def handle_call({:reserve, who, weight, advertised, own_us}, _from, state) do
     now = System.monotonic_time(:microsecond)
+    state = sweep(state, now)
     me = Map.get(state.queues, who, new_queue())
+    me = if now > me.until, do: %{me | waiting: false}, else: me
     me = %{me | asked: now, advertised: positive(advertised)}
-    state = %{state | queues: Map.put(state.queues, who, me)}
+    state = note_advertised(%{state | queues: Map.put(state.queues, who, me)}, who, me, now)
     {rate, state} = total(state, now)
 
     if rate <= 0 do
@@ -192,7 +205,16 @@ defmodule Spillway.SharedPace do
   def handle_info(_msg, state), do: {:noreply, state}
 
   defp new_queue,
-    do: %{pass: 0.0, advertised: nil, waiting: false, since: 0, asked: 0, ready_at: 0, until: 0}
+    do: %{
+      pass: 0.0,
+      stride: 0.0,
+      advertised: nil,
+      waiting: false,
+      since: 0,
+      asked: 0,
+      ready_at: 0,
+      until: 0
+    }
 
   defp positive(n) when is_number(n) and n > 0, do: n
   defp positive(_), do: nil
@@ -203,13 +225,23 @@ defmodule Spillway.SharedPace do
     # set to the wait returned here); one that doesn't has stopped.
     stale = 2 * interval + 100_000
 
-    queues =
-      state.queues
-      |> Map.reject(fn {_k, q} -> now - q.asked > @forget_us end)
-      |> Map.new(fn {k, q} -> {k, if(now > q.until, do: %{q | waiting: false}, else: q)} end)
+    state = drop_closed_contenders(state, now)
 
-    me = %{queues[who] | pass: max(queues[who].pass, state.vtime)}
-    state = %{state | queues: Map.put(queues, who, me)}
+    # The step this queue's last slot added to its pass was for its weight
+    # then. If the target has since changed its rate, redo that step at the
+    # new weight: a tenant promoted from 0.5 to 600 would otherwise wait out
+    # a 2-unit step, about 1,200 slots of a queue at 600, before its first
+    # turn at the new rate.
+    stride = 1 / weight
+    me = state.queues[who]
+
+    me =
+      if me.stride > 0 and me.stride != stride,
+        do: %{me | pass: me.pass + stride - me.stride, stride: stride},
+        else: me
+
+    me = %{me | pass: max(me.pass, state.vtime)}
+    state = %{state | queues: Map.put(state.queues, who, me)}
     next = state.last && state.last + interval
 
     cond do
@@ -233,7 +265,8 @@ defmodule Spillway.SharedPace do
 
         me = %{
           me
-          | pass: me.pass + 1 / weight,
+          | pass: me.pass + stride,
+            stride: stride,
             waiting: false,
             since: now,
             ready_at: start + own_us,
@@ -245,7 +278,8 @@ defmodule Spillway.SharedPace do
            state
            | last: start,
              vtime: state.queues[who].pass,
-             queues: Map.put(state.queues, who, me)
+             queues: Map.put(state.queues, who, me),
+             contenders: MapSet.put(state.contenders, who)
          }}
     end
   end
@@ -253,11 +287,77 @@ defmodule Spillway.SharedPace do
   defp turned_away(state, who, now, stale) do
     q = state.queues[who]
     q = if q.waiting, do: q, else: %{q | waiting: true, since: now}
-    %{state | queues: Map.put(state.queues, who, %{q | ready_at: now, until: now + stale})}
+
+    %{
+      state
+      | queues: Map.put(state.queues, who, %{q | ready_at: now, until: now + stale}),
+        contenders: MapSet.put(state.contenders, who)
+    }
+  end
+
+  # Contenders whose window closed stop contending.
+  defp drop_closed_contenders(state, now) do
+    {open, closed} =
+      Enum.split_with(state.contenders, fn k ->
+        q = state.queues[k]
+        q != nil and now <= q.until
+      end)
+
+    queues =
+      Enum.reduce(closed, state.queues, fn k, queues ->
+        case queues do
+          %{^k => q} -> Map.put(queues, k, %{q | waiting: false})
+          _ -> queues
+        end
+      end)
+
+    %{state | contenders: MapSet.new(open), queues: queues}
+  end
+
+  # Forgets queues that stopped asking, at most once a second.
+  defp sweep(%{swept: swept} = state, now) when is_integer(swept) and now - swept < 1_000_000,
+    do: state
+
+  defp sweep(state, now) do
+    queues = Map.reject(state.queues, fn {_k, q} -> now - q.asked > @forget_us end)
+
+    %{
+      state
+      | swept: now,
+        queues: queues,
+        contenders: MapSet.filter(state.contenders, &Map.has_key?(queues, &1))
+    }
+  end
+
+  defp note_advertised(state, who, me, now) do
+    cond do
+      me.advertised != nil and (state.top == nil or me.advertised >= state.top) ->
+        %{state | top: me.advertised, top_who: who}
+
+      state.top_who == who ->
+        # The top queue lowered its rate or stopped advertising.
+        recompute_top(state, now)
+
+      true ->
+        state
+    end
+  end
+
+  defp recompute_top(state, now) do
+    {top, who} =
+      Enum.reduce(state.queues, {nil, nil}, fn {k, q}, {top, who} ->
+        if q.advertised && now - q.asked <= @active_us && (top == nil or q.advertised > top),
+          do: {q.advertised, k},
+          else: {top, who}
+      end)
+
+    %{state | top: top, top_who: who}
   end
 
   defp someone_first?(state, who, me, now) do
-    Enum.any?(state.queues, fn {k, q} ->
+    Enum.any?(state.contenders, fn k ->
+      q = state.queues[k]
+
       if k == who or now > q.until or now < q.ready_at do
         false
       else
@@ -289,15 +389,15 @@ defmodule Spillway.SharedPace do
   end
 
   defp total(state, now) do
-    top =
-      Enum.reduce(state.queues, nil, fn {_k, q}, top ->
-        if q.advertised && now - q.asked <= @active_us && (top == nil or q.advertised > top),
-          do: q.advertised,
-          else: top
-      end)
+    state =
+      case state.queues[state.top_who] do
+        %{asked: asked} when now - asked <= @active_us -> state
+        _ when state.top_who != nil -> recompute_top(state, now)
+        _ -> state
+      end
 
     cond do
-      top != nil -> {top, state}
+      state.top != nil -> {state.top, state}
       is_number(state.ceiling) -> {state.ceiling, state}
       true -> {0, state}
     end

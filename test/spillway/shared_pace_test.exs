@@ -51,6 +51,24 @@ defmodule Spillway.SharedPaceTest do
       end
     end
 
+    test "the total drops as soon as the top queue lowers its rate", %{domain: domain} do
+      SharedPace.set_ceiling(domain, 2.0)
+      SharedPace.reserve_slot(domain, :emergency, 1000.0, 1000.0, 0)
+      SharedPace.reserve_slot(domain, :other, 10.0, 10.0, 0)
+      assert SharedPace.rate(domain) == 1000.0
+      SharedPace.reserve_slot(domain, :emergency, 10.0, 10.0, 0)
+      assert SharedPace.rate(domain) == 10.0
+    end
+
+    test "a promoted queue gets its new share at once", %{domain: domain} do
+      SharedPace.set_ceiling(domain, 60.0)
+      # low takes a slot at 0.5, a step of 2, and is then promoted to 600.
+      assert {:ok, _} = SharedPace.reserve_slot(domain, :low, 0.5, 0.5, 0)
+      # Each with its own interval at 600/s, like a real queue.
+      got = contend(domain, %{low: 600.0, busy: 600.0}, 1_000, 1_667)
+      assert Map.get(got, :low, 0) >= 20, "promoted queue got #{inspect(got)} in its first second"
+    end
+
     test "a target advertising less than configured lowers the total", %{domain: domain} do
       SharedPace.set_ceiling(domain, 20.0)
       SharedPace.reserve_slot(domain, :a, 1.0, 1.0, 0)
@@ -110,30 +128,31 @@ defmodule Spillway.SharedPaceTest do
 
   # Each queue in weights asks for a slot (advertising its weight) whenever
   # it's told to, for duration_ms of wall time; returns the slots each took.
-  defp contend(domain, weights, duration_ms) do
+  defp contend(domain, weights, duration_ms, own_us \\ 0) do
     deadline = System.monotonic_time(:millisecond) + duration_ms
 
     weights
     |> Enum.map(fn {name, w} ->
       Task.async(fn ->
-        {name, ask_until(domain, name, w, deadline, 0)}
+        {name, ask_until(domain, name, w, own_us, deadline, 0)}
       end)
     end)
     |> Task.await_many(duration_ms + 5_000)
     |> Map.new()
   end
 
-  defp ask_until(domain, name, w, deadline, n) do
+  defp ask_until(domain, name, w, own_us, deadline, n) do
     if System.monotonic_time(:millisecond) >= deadline do
       n
     else
-      case SharedPace.reserve_slot(domain, name, w, w, 0) do
+      case SharedPace.reserve_slot(domain, name, w, w, own_us) do
         {:ok, _age} ->
-          ask_until(domain, name, w, deadline, n + 1)
+          if own_us > 0, do: Process.sleep(max(div(own_us, 1_000), 1))
+          ask_until(domain, name, w, own_us, deadline, n + 1)
 
         {:wait, ms} ->
           Process.sleep(ms)
-          ask_until(domain, name, w, deadline, n)
+          ask_until(domain, name, w, own_us, deadline, n)
       end
     end
   end
