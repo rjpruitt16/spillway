@@ -6,7 +6,7 @@ defmodule Spillway.SharedPaceTest do
 
   alias Spillway.{AccountQueueRegistry, Job, SharedPace}
 
-  describe "reserve/2" do
+  describe "reserve and the total" do
     setup do
       domain = "pace-#{System.unique_integer([:positive])}"
       on_exit(fn -> stop(domain) end)
@@ -30,21 +30,31 @@ defmodule Spillway.SharedPaceTest do
       assert SharedPace.reserve(domain, :b) == 0
     end
 
-    test "the advertised rate replaces a static ceiling", %{domain: domain} do
+    test "the highest rate advertised to an active queue is the total", %{domain: domain} do
       SharedPace.set_ceiling(domain, 2.0)
-      SharedPace.advertise(domain, 100.0)
-      assert SharedPace.rate(domain) == 100.0
-      assert SharedPace.reserve(domain, :a) == 0
-      assert SharedPace.reserve(domain, :a) == 0
-      assert SharedPace.reserve(domain, :a) in 1..10
+      assert SharedPace.rate(domain) == 2.0
+      SharedPace.reserve_slot(domain, :vip, 1000.0, 1000.0, 0)
+      SharedPace.reserve_slot(domain, :free, 10.0, 10.0, 0)
+      assert SharedPace.rate(domain) == 1000.0
+      # A queue that sent nothing doesn't lower it.
+      SharedPace.reserve_slot(domain, :quiet, 2.0, nil, 0)
+      assert SharedPace.rate(domain) == 1000.0
     end
 
-    test "the latest advertised rate wins", %{domain: domain} do
+    test "per-tenant rates don't flip the total (the old latest-wins bug)", %{domain: domain} do
       SharedPace.set_ceiling(domain, 2.0)
-      SharedPace.advertise(domain, 50.0)
-      SharedPace.advertise(domain, 2.0)
-      SharedPace.advertise(domain, 50.0)
-      assert SharedPace.rate(domain) == 50.0
+
+      for _ <- 1..5 do
+        SharedPace.reserve_slot(domain, :vip, 50.0, 50.0, 0)
+        SharedPace.reserve_slot(domain, :free, 1.0, 1.0, 0)
+        assert SharedPace.rate(domain) == 50.0
+      end
+    end
+
+    test "a target advertising less than configured lowers the total", %{domain: domain} do
+      SharedPace.set_ceiling(domain, 20.0)
+      SharedPace.reserve_slot(domain, :a, 1.0, 1.0, 0)
+      assert SharedPace.rate(domain) == 1.0
     end
 
     test "a new owner takes over, and the old one going down doesn't stop the pace",
@@ -67,6 +77,171 @@ defmodule Spillway.SharedPaceTest do
       assert SharedPace.reserve(domain, :a) == 0
       assert SharedPace.reserve(domain, :a) == 0
       assert SharedPace.reserve(domain, :a) in 1_900..2_000
+    end
+  end
+
+  describe "weighted turns" do
+    setup do
+      domain = "pace-#{System.unique_integer([:positive])}"
+      on_exit(fn -> stop(domain) end)
+      {:ok, domain: domain}
+    end
+
+    # Wildly unfair on purpose: the target advertises 200, 20 and 2. Three
+    # always-backlogged queues ask as soon as they're told; the total is 200/s
+    # and they should get 90.1%, 9.0% and 0.9%.
+    @tag timeout: 30_000
+    test "slots split in proportion to the advertised rates", %{domain: domain} do
+      SharedPace.set_ceiling(domain, 2.0)
+      weights = %{vip: 200.0, standard: 20.0, low: 2.0}
+      got = contend(domain, weights, 5_000)
+      total = got |> Map.values() |> Enum.sum()
+      IO.puts("weighted turns: #{inspect(got)} in 5 s")
+      assert total in 900..1_010, "want about 1000 slots at 200/s, got #{total}"
+
+      for {name, w} <- weights do
+        want = total * w / 222
+
+        assert abs(got[name] - want) <= max(want * 0.1, 3),
+               "#{name} took #{got[name]}, want about #{round(want)} (#{inspect(got)})"
+      end
+    end
+  end
+
+  # Each queue in weights asks for a slot (advertising its weight) whenever
+  # it's told to, for duration_ms of wall time; returns the slots each took.
+  defp contend(domain, weights, duration_ms) do
+    deadline = System.monotonic_time(:millisecond) + duration_ms
+
+    weights
+    |> Enum.map(fn {name, w} ->
+      Task.async(fn ->
+        {name, ask_until(domain, name, w, deadline, 0)}
+      end)
+    end)
+    |> Task.await_many(duration_ms + 5_000)
+    |> Map.new()
+  end
+
+  defp ask_until(domain, name, w, deadline, n) do
+    if System.monotonic_time(:millisecond) >= deadline do
+      n
+    else
+      case SharedPace.reserve_slot(domain, name, w, w, 0) do
+        {:ok, _age} ->
+          ask_until(domain, name, w, deadline, n + 1)
+
+        {:wait, ms} ->
+          Process.sleep(ms)
+          ask_until(domain, name, w, deadline, n)
+      end
+    end
+  end
+
+  defmodule WeightedTarget do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(%Plug.Conn{request_path: "/.well-known/l8"} = conn, _opts),
+      do: send_resp(conn, 404, "")
+
+    def call(conn, _opts) do
+      "/work/" <> tenant = conn.request_path
+      {rates, counter} = :persistent_term.get(:weighted_target)
+      if counter, do: Agent.update(counter, &Map.update(&1, tenant, 1, fn n -> n + 1 end))
+
+      conn
+      |> put_resp_header("x-aqueduct-account-queue", "enabled")
+      |> put_resp_header("x-aqueduct-rps", to_string(Map.fetch!(rates, tenant)))
+      |> put_resp_header("x-aqueduct-max-concurrent", "4")
+      |> send_resp(200, "ok")
+    end
+  end
+
+  # End to end through real account queues: an unconfigured target (2 rps
+  # default) advertises wildly different rates to three tenants, 60, 6 and
+  # 0.6. The total must rise to 60/s and split 90.0/9.0/0.9%. Then the target
+  # swaps the first and last, and the shares must follow.
+  @tag timeout: 90_000
+  test "a target sets its total and each tenant's share by what it advertises" do
+    rates = %{"vip" => 60.0, "standard" => 6.0, "low" => 0.6}
+    swapped = %{"vip" => 0.6, "standard" => 6.0, "low" => 60.0}
+    :persistent_term.put(:weighted_target, {rates, nil})
+    port = 30_000 + rem(System.unique_integer([:positive]), 2_000)
+    {:ok, server} = Bandit.start_link(plug: WeightedTarget, port: port, startup_log: false)
+    base = "http://localhost:#{port}"
+
+    on_exit(fn ->
+      case :ets.lookup(:url_actors, base) do
+        [{_, actor}] ->
+          queues = :sys.get_state(actor).queues |> Map.values()
+          Enum.each([actor | queues], &Process.exit(&1, :kill))
+
+        [] ->
+          :ok
+      end
+
+      if Process.alive?(server), do: Process.exit(server, :kill)
+      :persistent_term.erase(:weighted_target)
+      Spillway.IdempotentStore.clear_ledger()
+    end)
+
+    # Enough that every queue stays backlogged through both phases (the
+    # leader takes about 54/s for 10 s in its phase).
+    for n <- 1..700, tenant <- ~w(vip standard low) do
+      key = "w-#{tenant}-#{n}-#{System.unique_integer([:positive])}"
+
+      AccountQueueRegistry.submit(
+        %Job{
+          id: key,
+          user_id: "w-#{tenant}",
+          idempotent_key: key,
+          url: "#{base}/work/#{tenant}",
+          method: "POST",
+          headers: %{"Authorization" => "key-#{tenant}"},
+          body: "",
+          webhook_url: "",
+          kind: :user,
+          status: :queued,
+          created_at: System.system_time(:millisecond)
+        },
+        "enabled"
+      )
+    end
+
+    measure = fn rates ->
+      {:ok, counter} = Agent.start_link(fn -> %{} end)
+      :persistent_term.put(:weighted_target, {rates, nil})
+      Process.sleep(2_000)
+      :persistent_term.put(:weighted_target, {rates, counter})
+      Process.sleep(8_000)
+      :persistent_term.put(:weighted_target, {rates, nil})
+      hits = Agent.get(counter, & &1)
+      Agent.stop(counter)
+      hits
+    end
+
+    for {phase, r} <- [{1, rates}, {2, swapped}] do
+      hits = measure.(r)
+      total = hits |> Map.values() |> Enum.sum()
+      rate = total / 8
+
+      IO.puts(
+        "phase #{phase}: #{Float.round(rate, 1)}/s, #{inspect(hits)} (advertised #{inspect(r)})"
+      )
+
+      assert rate >= 51 and rate <= 66, "phase #{phase}: #{rate}/s; want about the advertised 60"
+      sum = r |> Map.values() |> Enum.sum()
+
+      for {tenant, w} <- r do
+        want = total * w / sum
+        got = Map.get(hits, tenant, 0)
+
+        assert abs(got - want) <= max(want * 0.15, 4),
+               "phase #{phase}: #{tenant} got #{got} of #{total}, want about #{round(want)}"
+      end
     end
   end
 
