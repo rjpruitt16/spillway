@@ -37,6 +37,10 @@ defmodule Spillway.AccountQueue do
     :url_actor,
     :pool_pid,
     rps: 2.0,
+    # The rate the target last advertised to this queue: its weight in the
+    # domain's Spillway.SharedPace, and its say in the target's total.
+    # Cleared by a failure.
+    advertised: nil,
     configured_rps: 2.0,
     max_concurrent: 1,
     queue: :queue.new(),
@@ -605,12 +609,23 @@ defmodule Spillway.AccountQueue do
       elapsed < interval_ms ->
         {:wait, arm_dispatch_timer(state, Jitter.add_ms(interval_ms - elapsed))}
 
-      # The target's total across every tenant queue (aquifer#146).
-      (wait_ms = SharedPace.reserve(state.upstream)) > 0 ->
-        {:wait, arm_dispatch_timer(state, wait_ms)}
-
       true ->
-        dispatch_due(state)
+        # The target's total across every tenant queue (aquifer#146), split
+        # by the rate it advertises to each.
+        # The rate the target advertised to this queue while it holds; only
+        # with none is it the queue's own pace.
+        weight = state.advertised || state.rps
+
+        case SharedPace.reserve_slot(
+               state.upstream,
+               self(),
+               weight,
+               state.advertised,
+               interval_ms * 1_000
+             ) do
+          {:wait, wait_ms} -> {:wait, arm_dispatch_timer(state, wait_ms)}
+          {:ok, age_us} -> dispatch_due(state, div(age_us, 1_000))
+        end
     end
   end
 
@@ -630,7 +645,21 @@ defmodule Spillway.AccountQueue do
     end
   end
 
-  defp dispatch_due(state) do
+  # When the queue's own pace counts this dispatch from: the shared pace's
+  # slot, not now, but never earlier than one own interval after the previous
+  # one. A slot carrying unused shared credit would otherwise let a 1 rps
+  # queue under an idle 10 rps total dispatch every 900 ms.
+  defp own_slot(state, slot_age_ms) do
+    max(
+      System.system_time(:millisecond) - slot_age_ms,
+      state.last_request_at + trunc(1_000 / state.rps)
+    )
+  end
+
+  # slot_age_ms: how long ago the shared pace scheduled this dispatch's slot.
+  # The queue's own pace counts from the slot, not from now, so its timer
+  # jitter doesn't push it behind the slot schedule (see SharedPace).
+  defp dispatch_due(state, slot_age_ms) do
     case resolve_target(state) do
       :no_pool_members ->
         # Pool-backed queue with no live members yet. This can happen
@@ -647,7 +676,7 @@ defmodule Spillway.AccountQueue do
           | queue: remaining_queue,
             queued: max(state.queued - 1, 0),
             in_flight: state.in_flight + 1,
-            last_request_at: System.system_time(:millisecond)
+            last_request_at: own_slot(state, slot_age_ms)
         }
 
         Metrics.queue_depth(state.upstream, new_state.queued)
@@ -1194,8 +1223,11 @@ defmodule Spillway.AccountQueue do
   # on every response, 503s included, would otherwise keep the queue at full
   # speed against a receiver that is down, and every job would use up its
   # retries within seconds.
-  defp penalize_rps(state, nil), do: %{state | rps: max(state.rps / 2, @min_rps)}
-  defp penalize_rps(state, rps), do: %{state | rps: max(min(state.rps / 2, rps), @min_rps)}
+  defp penalize_rps(state, nil),
+    do: %{state | rps: max(state.rps / 2, @min_rps), advertised: nil}
+
+  defp penalize_rps(state, rps),
+    do: %{state | rps: max(min(state.rps / 2, rps), @min_rps), advertised: nil}
 
   defp maybe_put_response(payload, nil), do: payload
 
@@ -1631,11 +1663,10 @@ defmodule Spillway.AccountQueue do
 
     if state.in_flight > 0, do: backlog_add(-1)
 
-    # The target's advertised rate is its total, shared by every tenant
-    # queue; the latest one wins, so every answer that carries one says so,
-    # not only one that changes this queue's own rate.
-    if is_number(rps_header),
-      do: SharedPace.advertise(state.upstream, max(rps_header, @min_rps))
+    # The advertised rate is this queue's weight in the shared pace, and the
+    # highest one advertised to an active queue is the target's total.
+    new_state =
+      if is_number(rps_header), do: %{new_state | advertised: rps_header}, else: new_state
 
     if new_state.rps != state.rps do
       Metrics.flow_rate(state.upstream, new_state.rps)

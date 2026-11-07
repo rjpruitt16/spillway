@@ -7,7 +7,7 @@ A durable queue that paces traffic into a service at the rate it can take, built
 A spillway is how a dam lets out water it can't hold, at a rate the river below can take. This one works in both directions: inbound, it holds the burst that agents and clients send your API; outbound, it holds the calls your app makes to rate-limited APIs.
 
 - **Retry storm mitigation.** Callers wait in a durable queue instead of hammering a struggling service with retries, and the queue drains as capacity comes back.
-- **Fairness.** Every tenant can get its own queue, paced on its own. In the fairness test, a quiet tenant's jobs finished in 1–5 s while another tenant flooded the same target; stuck behind the flood in one shared queue, they took 35–52 s.
+- **Fairness.** Every tenant can get its own queue, paced on its own. In the fairness test, a quiet tenant's jobs finished in 1–5 s while another tenant flooded the same target; stuck behind the flood in one shared queue, they took 35–52 s. Turns are equal by default, but the target can make them as unfair as it needs, live, by advertising a higher rate to one tenant: an emergency can take nearly all of a target's capacity for as long as it lasts ([dynamic priority](docs/pacing.md#dynamic-priority)).
 - **Delivery however the caller wants it:** results on the same connection (`POST /proxy`), a live event stream, or a durable webhook that's paced and retried like any other job, plus WebSocket sessions proxied with a transcript that replays anything missed after a reconnect.
 
 ![Traditional load balancing collapsing under a spike, round-robin flickering faster as instances die, versus Aqueduct pacing that keeps the fleet stable while an autoscaler brings real capacity online](docs/images/fleet-degradation.gif)
